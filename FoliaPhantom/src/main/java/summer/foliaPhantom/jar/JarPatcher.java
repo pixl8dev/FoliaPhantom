@@ -5,6 +5,8 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
 
+import java.nio.charset.StandardCharsets;
+
 public class JarPatcher {
 
     /**
@@ -12,44 +14,35 @@ public class JarPatcher {
      *
      * @param originalJar The original plugin JAR file.
      * @param patchedJar  The destination file for the patched JAR.
-     * @throws Exception If any error occurs during patching.
+     * @throws IOException If any I/O error occurs during patching.
      */
-    public static void createFoliaSupportedJar(File originalJar, File patchedJar) throws Exception {
-        try (JarInputStream jis = new JarInputStream(new FileInputStream(originalJar));
-             JarOutputStream jos = new JarOutputStream(new FileOutputStream(patchedJar))) {
+    public static void createFoliaSupportedJar(File originalJar, File patchedJar) throws IOException {
+        try (JarInputStream jis = new JarInputStream(new BufferedInputStream(new FileInputStream(originalJar)));
+             JarOutputStream jos = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(patchedJar)))) {
 
-            JarEntry entry;
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[8192];
             boolean pluginYmlFound = false;
 
+            JarEntry entry;
             while ((entry = jis.getNextJarEntry()) != null) {
-                String entryName = entry.getName();
-                if ("plugin.yml".equals(entryName)) {
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    int len;
-                    while ((len = jis.read(buffer)) > 0) {
-                        baos.write(buffer, 0, len);
-                    }
-                    String originalContent = baos.toString("UTF-8");
-                    String modifiedContent = addFoliaSupport(originalContent);
-                    JarEntry newEntry = new JarEntry("plugin.yml");
-                    jos.putNextEntry(newEntry);
-                    jos.write(modifiedContent.getBytes("UTF-8"));
-                    jos.closeEntry();
+                if ("plugin.yml".equals(entry.getName())) {
                     pluginYmlFound = true;
+                    String originalContent = new String(jis.readAllBytes(), StandardCharsets.UTF_8);
+                    String modifiedContent = addFoliaSupport(originalContent);
+                    jos.putNextEntry(new JarEntry("plugin.yml"));
+                    jos.write(modifiedContent.getBytes(StandardCharsets.UTF_8));
                 } else {
-                    jos.putNextEntry(new JarEntry(entryName));
+                    jos.putNextEntry(new JarEntry(entry.getName()));
                     int len;
                     while ((len = jis.read(buffer)) > 0) {
                         jos.write(buffer, 0, len);
                     }
-                    jos.closeEntry();
                 }
-                jis.closeEntry();
+                jos.closeEntry();
             }
 
             if (!pluginYmlFound) {
-                throw new Exception("patch: plugin.yml was not found in " + originalJar.getName());
+                throw new IOException("patch: plugin.yml was not found in " + originalJar.getName());
             }
         }
     }
@@ -93,7 +86,7 @@ public class JarPatcher {
             System.out.println("Patching " + originalJar.getName() + " to " + patchedJar.getName() + "...");
             createFoliaSupportedJar(originalJar, patchedJar);
             System.out.println("Successfully patched JAR: " + patchedJar.getAbsolutePath());
-        } catch (Exception e) {
+        } catch (IOException e) {
             System.err.println("Error during patching: " + e.getMessage());
             e.printStackTrace();
             System.exit(1);

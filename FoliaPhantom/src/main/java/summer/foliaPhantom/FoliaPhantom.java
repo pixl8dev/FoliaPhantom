@@ -24,6 +24,8 @@ import summer.foliaPhantom.jar.JarPatcher;
 import summer.foliaPhantom.plugin.PluginLoader;
 import summer.foliaPhantom.plugin.WrappedPlugin;
 // summer.foliaPhantom.scheduler.FoliaSchedulerAdapter import is not directly used by FoliaPhantom
+import summer.foliaPhantom.config.ConfigManager;
+import summer.foliaPhantom.config.PluginConfig;
 // summer.foliaPhantom.scheduler.FoliaSchedulerProxy import is not directly used by FoliaPhantom
 import summer.foliaPhantom.scheduler.SchedulerManager;
 // FoliaBukkitTask is used by FoliaSchedulerProxy, direct import might not be needed in FoliaPhantom itself
@@ -46,64 +48,12 @@ public class FoliaPhantom extends JavaPlugin {
     @Override
     public void onLoad() {
         getLogger().info("[Phantom] === FoliaPhantom onLoad ===");
-        // Initialize server type detection. This boolean will affect how scheduling is handled.
         isFoliaServer = detectServerType();
-
-        // config.yml を生成/ロード
         saveDefaultConfig();
 
         try {
-            this.pluginLoader = new PluginLoader(this);
-            // まず Folia Scheduler を差し替える
-            this.schedulerManager = new SchedulerManager(this);
-            if (!this.schedulerManager.installProxy()) {
-                getLogger().severe("[Phantom] Critical error: Failed to install scheduler proxy. FoliaPhantom will not function correctly.");
-                // Optionally disable the plugin itself if scheduler is critical
-                // getServer().getPluginManager().disablePlugin(this);
-                // return; // if inside onLoad and further loading depends on it
-            } else {
-                getLogger().info("[Phantom] SchedulerManager initialized and proxy installed.");
-            }
-
-            // config.yml の wrapped-plugins セクションを読み込む
-            List<Map<?, ?>> wrappedList = getConfig().getMapList("wrapped-plugins");
-            if (wrappedList == null || wrappedList.isEmpty()) {
-                getLogger().warning("[Phantom] config.yml に wrapped-plugins が見つかりません。ラップ対象がありません。");
-            } else {
-                for (Map<?, ?> rawEntry : wrappedList) {
-                    if (rawEntry == null) continue;
-                    String name = (rawEntry.get("name") instanceof String)
-                            ? (String) rawEntry.get("name")
-                            : "<Unknown>";
-                    String originalPath = (rawEntry.get("original-jar-path") instanceof String)
-                            ? (String) rawEntry.get("original-jar-path")
-                            : "";
-                    String patchedPath = (rawEntry.get("patched-jar-path") instanceof String)
-                            ? (String) rawEntry.get("patched-jar-path")
-                            : originalPath;
-                    Boolean foliaEnabled = (rawEntry.get("folia-enabled") instanceof Boolean)
-                            ? (Boolean) rawEntry.get("folia-enabled")
-                            : Boolean.TRUE;
-
-                    // PluginConfig was introduced in a previous step, assuming it's still relevant here.
-                    // If loadWrappedPlugin was removed and PluginConfig is not used elsewhere in onLoad,
-                    // this part might need adjustment based on where PluginConfig is now instantiated.
-                    // For this specific step, we focus on replacing loadWrappedPlugin with WrappedPlugin instantiation.
-                    summer.foliaPhantom.config.PluginConfig config = new summer.foliaPhantom.config.PluginConfig(name, originalPath, patchedPath, foliaEnabled);
-
-                    getLogger().info("[Phantom][" + config.name() + "] Processing plugin configuration...");
-                    WrappedPlugin wrappedPlugin = new WrappedPlugin(config, pluginLoader, getDataFolder(), getLogger());
-                    if (wrappedPlugin.getBukkitPlugin() != null) {
-                        wrappedPlugins.put(config.name(), wrappedPlugin);
-                    } else {
-                        // If plugin failed to load, WrappedPlugin constructor would have logged it.
-                        // PluginLoader also attempts to clean up its classloader for this plugin on failure.
-                        // No need to add to wrappedPlugins map.
-                        getLogger().severe("[Phantom][" + config.name() + "] Was not added to the list of active wrapped plugins due to loading failure.");
-                    }
-                }
-            }
-
+            initializeComponents();
+            loadWrappedPlugins();
             getLogger().info("[Phantom] onLoad completed.");
         } catch (Exception e) {
             getLogger().severe("[Phantom] FoliaPhantom onLoad 中に例外: " + e.getMessage());
@@ -111,30 +61,54 @@ public class FoliaPhantom extends JavaPlugin {
         }
     }
 
+    private void initializeComponents() {
+        this.pluginLoader = new PluginLoader(this);
+        this.schedulerManager = new SchedulerManager(this);
+        if (!this.schedulerManager.installProxy()) {
+            getLogger().severe("[Phantom] Critical error: Failed to install scheduler proxy. FoliaPhantom will not function correctly.");
+        } else {
+            getLogger().info("[Phantom] SchedulerManager initialized and proxy installed.");
+        }
+    }
+
+    private void loadWrappedPlugins() {
+        ConfigManager configManager = new ConfigManager(this);
+        List<PluginConfig> pluginConfigs = configManager.loadPluginConfigs();
+
+        for (PluginConfig config : pluginConfigs) {
+            getLogger().info("[Phantom][" + config.name() + "] Processing plugin configuration...");
+            WrappedPlugin wrappedPlugin = new WrappedPlugin(config, pluginLoader, getDataFolder(), getLogger());
+            if (wrappedPlugin.getBukkitPlugin() != null) {
+                wrappedPlugins.put(config.name(), wrappedPlugin);
+            } else {
+                getLogger().severe("[Phantom][" + config.name() + "] Was not added to the list of active wrapped plugins due to loading failure.");
+            }
+        }
+    }
+
     @Override
     public void onEnable() {
         getLogger().info("[Phantom] === FoliaPhantom onEnable ===");
+        enablePlugins();
+    }
 
+    private void enablePlugins() {
         if (wrappedPlugins.isEmpty()) {
             getLogger().warning("[Phantom] ラップ対象プラグインが存在しません。FoliaPhantom を無効化します。");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
 
-        for (Map.Entry<String, WrappedPlugin> entry : wrappedPlugins.entrySet()) {
-            String name = entry.getKey();
-            WrappedPlugin wrappedPlugin = entry.getValue();
-            Plugin plugin = wrappedPlugin.getBukkitPlugin(); // Get the actual Bukkit Plugin
+        for (WrappedPlugin wrappedPlugin : wrappedPlugins.values()) {
+            Plugin plugin = wrappedPlugin.getBukkitPlugin();
             if (plugin != null && !plugin.isEnabled()) {
-                getLogger().info("[Phantom][" + name + "] Enabling wrapped plugin...");
+                getLogger().info("[Phantom][" + wrappedPlugin.getName() + "] Enabling wrapped plugin...");
                 try {
                     getServer().getPluginManager().enablePlugin(plugin);
-                    getLogger().info("[Phantom][" + name + "] 有効化完了.");
-                } catch (Throwable ex) { // Catch Throwable to be safe with severe errors
-                    getLogger().severe("[Phantom][" + name + "] Exception during enablePlugin() for " + name + ": " + ex.getMessage());
+                    getLogger().info("[Phantom][" + wrappedPlugin.getName() + "] 有効化完了.");
+                } catch (Throwable ex) {
+                    getLogger().severe("[Phantom][" + wrappedPlugin.getName() + "] Exception during enablePlugin(): " + ex.getMessage());
                     ex.printStackTrace();
-                    // Do not disable FoliaPhantom itself. Log and continue.
-                    // The problematic plugin will likely be left disabled by the server.
                 }
             }
         }
@@ -144,38 +118,35 @@ public class FoliaPhantom extends JavaPlugin {
     @Override
     public void onDisable() {
         getLogger().info("[Phantom] === FoliaPhantom onDisable ===");
+        disablePlugins();
+        cleanup();
+    }
 
-        // 全プラグインを無効化
-        for (Map.Entry<String, WrappedPlugin> entry : wrappedPlugins.entrySet()) {
-            String name = entry.getKey();
-            WrappedPlugin wrappedPlugin = entry.getValue();
+    private void disablePlugins() {
+        for (WrappedPlugin wrappedPlugin : wrappedPlugins.values()) {
             Plugin plugin = wrappedPlugin.getBukkitPlugin();
             if (plugin != null && plugin.isEnabled()) {
-                getLogger().info("[Phantom][" + name + "] Disabling wrapped plugin...");
+                getLogger().info("[Phantom][" + wrappedPlugin.getName() + "] Disabling wrapped plugin...");
                 try {
                     getServer().getPluginManager().disablePlugin(plugin);
-                    getLogger().info("[Phantom][" + name + "] 無効化完了.");
+                    getLogger().info("[Phantom][" + wrappedPlugin.getName() + "] 無効化完了.");
                 } catch (Exception ex) {
-                    getLogger().warning("[Phantom][" + name + "] disablePlugin() 例外: " + ex.getMessage());
+                    getLogger().warning("[Phantom][" + wrappedPlugin.getName() + "] disablePlugin() 例外: " + ex.getMessage());
                 }
             }
-            // Optional: if WrappedPlugin had specific cleanup beyond classloader (which PluginLoader handles)
-            // wrappedPlugin.unload(); // PluginLoader.closeClassLoader is called by WrappedPlugin.unload()
         }
-        // The call to pluginLoader.closeAllClassLoaders() remains in onDisable to ensure all are closed.
-        // Individual wrappedPlugin.unload() could be called if we want to close classloaders one by one
-        // before the global closeAll. For now, global closeAll is likely sufficient.
         wrappedPlugins.clear();
+    }
 
-        // Scheduler を元に戻す
+    private void cleanup() {
         if (this.schedulerManager != null) {
             this.schedulerManager.restoreOriginalScheduler();
+            getLogger().info("[Phantom] Scheduler を復元しました。");
         }
-        getLogger().info("[Phantom] Scheduler を復元しました。");
-
-        // ClassLoader を全てクローズ
-        pluginLoader.closeAllClassLoaders();
-        getLogger().info("[Phantom] 全ての ClassLoader をクローズしました。");
+        if (this.pluginLoader != null) {
+            pluginLoader.closeAllClassLoaders();
+            getLogger().info("[Phantom] 全ての ClassLoader をクローズしました。");
+        }
     }
 
     /**
