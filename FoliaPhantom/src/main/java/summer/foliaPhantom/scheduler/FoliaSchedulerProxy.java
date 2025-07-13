@@ -30,16 +30,41 @@ public class FoliaSchedulerProxy implements InvocationHandler {
     private final boolean isFoliaServer;
     private final Map<Integer, ScheduledTask> taskMap = new ConcurrentHashMap<>();
     private int taskIdCounter = 1000; // Start from a higher number to avoid collision with vanilla tasks
+    private final summer.foliaPhantom.proxy.ProxyManager proxyManager;
+
 
     // Modified constructor
-    public FoliaSchedulerProxy(BukkitScheduler originalScheduler, FoliaSchedulerAdapter foliaAdapter, boolean isFoliaServer) {
+    public FoliaSchedulerProxy(BukkitScheduler originalScheduler, FoliaSchedulerAdapter foliaAdapter, boolean isFoliaServer, Plugin plugin) {
         this.originalScheduler = originalScheduler;
         this.foliaAdapter = foliaAdapter;
         this.isFoliaServer = isFoliaServer;
+        this.proxyManager = new summer.foliaPhantom.proxy.ProxyManager(foliaAdapter, plugin);
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        // Worldを返すメソッドをインターセプト
+        if (World.class.isAssignableFrom(method.getReturnType())) {
+            Object result = method.invoke(originalScheduler, args);
+            if (result instanceof World) {
+                return proxyManager.getProxiedWorld((World) result);
+            }
+            return result;
+        }
+
+        // Worldのリストを返すメソッドをインターセプト (例: "getWorlds")
+        if (method.getName().equals("getWorlds")) {
+            Object result = method.invoke(originalScheduler, args);
+            if (result instanceof java.util.List) {
+                @SuppressWarnings("unchecked")
+                java.util.List<World> originalWorlds = (java.util.List<World>) result;
+                return originalWorlds.stream()
+                        .map(proxyManager::getProxiedWorld)
+                        .collect(java.util.stream.Collectors.toList());
+            }
+            return result;
+        }
+
         // Conditional scheduling logic based on detected server type.
         // If the server is not Folia, all scheduler method calls are passed directly to the
         // original BukkitScheduler. This ensures that on non-Folia platforms (like Spigot or Paper
