@@ -1,4 +1,5 @@
 /app/FoliaPhantom/src/main/java/summer/foliaPhantom/FoliaPhantom.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/config/ConfigManager.java
 /app/FoliaPhantom/src/main/java/summer/foliaPhantom/config/PluginConfig.java
 /app/FoliaPhantom/src/main/java/summer/foliaPhantom/jar/JarPatcher.java
 /app/FoliaPhantom/src/main/java/summer/foliaPhantom/plugin/PluginLoader.java

@@ -1,4 +1,5 @@
 summer/foliaPhantom/scheduler/FoliaSchedulerAdapter.class
+summer/foliaPhantom/config/ConfigManager.class
 summer/foliaPhantom/jar/JarPatcher.class
 summer/foliaPhantom/plugin/WrappedPlugin.class
 summer/foliaPhantom/FoliaPhantom.class
