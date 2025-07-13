@@ -63,10 +63,10 @@ public class WorldInvocationHandler implements InvocationHandler {
                 if (args.length >= 2 && args[0] instanceof Integer && args[1] instanceof Integer) {
                     int x = (int) args[0];
                     int z = (int) args[1];
-                    logger.info("[Phantom] Wrapping " + methodName + " in RegionScheduler for chunk (" + x + ", " + z + ").");
+                    logger.info("[Phantom] Wrapping " + methodName + " in runTaskAtChunk for chunk (" + x + ", " + z + ").");
 
                     CompletableFuture<Object> chunkFuture = new CompletableFuture<>();
-                    scheduler.runRegionSyncTask(() -> {
+                    scheduler.runTaskAtChunk(() -> {
                         try {
                             chunkFuture.complete(method.invoke(originalWorld, args));
                         } catch (Throwable t) {

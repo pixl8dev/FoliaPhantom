@@ -140,8 +140,7 @@ public class FoliaPhantom extends JavaPlugin {
 
     private void cleanup() {
         if (this.schedulerManager != null) {
-            this.schedulerManager.restoreOriginalScheduler();
-            getLogger().info("[Phantom] Scheduler を復元しました。");
+            this.schedulerManager.restoreOriginalServer();
         }
         if (this.pluginLoader != null) {
             pluginLoader.closeAllClassLoaders();
