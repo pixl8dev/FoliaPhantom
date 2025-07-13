@@ -81,6 +81,14 @@ public class FoliaSchedulerAdapter {
         }
     }
 
+    public ScheduledTask runTaskAtChunk(Runnable runnable, World world, int chunkX, int chunkZ) {
+        if (world == null) {
+            plugin.getLogger().warning("[PhantomScheduler] World was null for a chunk-specific task. Falling back to async scheduler.");
+            return asyncScheduler.runNow(plugin, task -> runnable.run());
+        }
+        return regionScheduler.run(plugin, world, chunkX, chunkZ, task -> runnable.run());
+    }
+
     private Location getDefaultLocation() {
         // Delegate to the new static method
         return getSafeDefaultLocation(this.plugin, this.plugin.getLogger());

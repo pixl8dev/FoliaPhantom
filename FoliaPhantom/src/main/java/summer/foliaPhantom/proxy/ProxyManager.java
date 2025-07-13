@@ -4,6 +4,7 @@ import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import summer.foliaPhantom.scheduler.FoliaSchedulerAdapter;
 
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 
 public class ProxyManager {
