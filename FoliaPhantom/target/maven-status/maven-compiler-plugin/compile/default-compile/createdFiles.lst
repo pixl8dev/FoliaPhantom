@@ -5,8 +5,8 @@ summer/foliaPhantom/config/PluginConfig.class
 summer/foliaPhantom/scheduler/FoliaSchedulerProxy.class
 summer/foliaPhantom/plugin/PluginLoader.class
 summer/foliaPhantom/scheduler/FoliaSchedulerAdapter.class
-summer/foliaPhantom/config/ConfigManager.class
 summer/foliaPhantom/proxy/ProxyManager.class
+summer/foliaPhantom/config/ConfigManager.class
 summer/foliaPhantom/plugin/WrappedPlugin.class
 summer/foliaPhantom/FoliaPhantom.class
 summer/foliaPhantom/proxy/EntityInvocationHandler.class

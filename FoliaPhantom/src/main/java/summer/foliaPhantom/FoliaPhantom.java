@@ -1,34 +1,18 @@
 package summer.foliaPhantom;
 
-import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
-import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
-import java.io.File; // Retained for File operations like getDataFolder()
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-// sun.misc.Unsafe removed
-// java.lang.reflect.Field, Method, Proxy removed
-// java.net.URL, URLClassLoader removed
-// java.util.concurrent.TimeUnit removed
-// java.util.jar.* removed
-// io.papermc.paper.threadedregions.scheduler.* removed as they are not directly used by FoliaPhantom class
-import summer.foliaPhantom.jar.JarPatcher;
+
 import summer.foliaPhantom.plugin.PluginLoader;
 import summer.foliaPhantom.plugin.WrappedPlugin;
-// summer.foliaPhantom.scheduler.FoliaSchedulerAdapter import is not directly used by FoliaPhantom
 import summer.foliaPhantom.config.ConfigManager;
 import summer.foliaPhantom.config.PluginConfig;
-// summer.foliaPhantom.scheduler.FoliaSchedulerProxy import is not directly used by FoliaPhantom
 import summer.foliaPhantom.scheduler.SchedulerManager;
-// FoliaBukkitTask is used by FoliaSchedulerProxy, direct import might not be needed in FoliaPhantom itself
 
 /**
  * FoliaPhantom – 任意の外部プラグインを Folia（Paper ThreadedRegions）対応に
@@ -64,10 +48,10 @@ public class FoliaPhantom extends JavaPlugin {
     private void initializeComponents() {
         this.pluginLoader = new PluginLoader(this);
         this.schedulerManager = new SchedulerManager(this);
-        if (!this.schedulerManager.installProxy()) {
-            getLogger().severe("[Phantom] Critical error: Failed to install scheduler proxy. FoliaPhantom will not function correctly.");
-        } else {
+        if (this.schedulerManager.installProxy()) {
             getLogger().info("[Phantom] SchedulerManager initialized and proxy installed.");
+        } else {
+            getLogger().severe("[Phantom] Critical error: Failed to install scheduler proxy. FoliaPhantom will not function correctly.");
         }
     }
 
