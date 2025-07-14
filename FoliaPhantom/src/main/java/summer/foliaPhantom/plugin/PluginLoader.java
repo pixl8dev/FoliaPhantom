@@ -36,31 +36,31 @@ public class PluginLoader {
             return null;
         }
 
-        URLClassLoader loader = null;
+        URLClassLoader loader;
         try {
             URL url = jarFile.toURI().toURL();
-            // Parent classloader should be the FoliaPhantom's classloader to allow access to Bukkit/Paper APIs
             loader = new URLClassLoader(new URL[]{url}, getClass().getClassLoader());
             pluginClassLoaders.put(pluginName, loader);
 
-            ClassLoader previousContextClassLoader = Thread.currentThread().getContextClassLoader();
             Thread.currentThread().setContextClassLoader(loader);
             Plugin plugin = pluginManager.loadPlugin(jarFile);
-            Thread.currentThread().setContextClassLoader(previousContextClassLoader);
 
             if (plugin != null) {
                 logger.info("[Phantom][" + pluginName + "] Plugin loaded successfully: " + plugin.getName() + " v" + plugin.getDescription().getVersion());
+                return plugin;
             } else {
                 logger.severe("[Phantom][" + pluginName + "] Failed to load plugin from JAR: " + jarFile.getName());
-                // If loadPlugin returns null, but no exception, cleanup classloader
                 closeClassLoader(pluginName);
+                return null;
             }
-            return plugin;
         } catch (Exception e) {
             logger.severe("[Phantom][" + pluginName + "] Exception during PluginManager.loadPlugin(): " + e.getMessage());
             e.printStackTrace();
             closeClassLoader(pluginName); // Ensure cleanup on failure
             return null;
+        } finally {
+            // Reset context class loader in a finally block to guarantee execution
+            Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
         }
     }
 
@@ -83,12 +83,11 @@ public class PluginLoader {
      * Closes all managed ClassLoaders.
      */
     public void closeAllClassLoaders() {
-        for (String pluginName : pluginClassLoaders.keySet()) {
-            // Create a copy of keys to avoid ConcurrentModificationException if closeClassLoader modifies the map
-            closeClassLoader(new String(pluginName));
-        }
-        // Ensure map is clear, though closeClassLoader should remove entries
-        pluginClassLoaders.clear();
+        // Use an iterator to safely remove elements during iteration
+        pluginClassLoaders.keySet().removeIf(pluginName -> {
+            closeClassLoader(pluginName);
+            return true; // Mark for removal
+        });
         logger.info("[Phantom] All managed plugin ClassLoaders have been requested to close.");
     }
 

@@ -33,19 +33,21 @@ public class ConfigManager {
         if (rawEntry == null) {
             return null;
         }
-        String name = (rawEntry.get("name") instanceof String)
-                ? (String) rawEntry.get("name")
-                : "<Unknown>";
-        String originalPath = (rawEntry.get("original-jar-path") instanceof String)
-                ? (String) rawEntry.get("original-jar-path")
-                : "";
-        String patchedPath = (rawEntry.get("patched-jar-path") instanceof String)
-                ? (String) rawEntry.get("patched-jar-path")
-                : originalPath;
-        Boolean foliaEnabled = (rawEntry.get("folia-enabled") instanceof Boolean)
-                ? (Boolean) rawEntry.get("folia-enabled")
-                : Boolean.TRUE;
+        String name = getString(rawEntry, "name", "<Unknown>");
+        String originalPath = getString(rawEntry, "original-jar-path", "");
+        String patchedPath = getString(rawEntry, "patched-jar-path", originalPath);
+        boolean foliaEnabled = getBoolean(rawEntry, "folia-enabled", true);
 
         return new PluginConfig(name, originalPath, patchedPath, foliaEnabled);
+    }
+
+    private String getString(Map<?, ?> map, String key, String defaultValue) {
+        Object value = map.get(key);
+        return (value instanceof String) ? (String) value : defaultValue;
+    }
+
+    private boolean getBoolean(Map<?, ?> map, String key, boolean defaultValue) {
+        Object value = map.get(key);
+        return (value instanceof Boolean) ? (Boolean) value : defaultValue;
     }
 }
