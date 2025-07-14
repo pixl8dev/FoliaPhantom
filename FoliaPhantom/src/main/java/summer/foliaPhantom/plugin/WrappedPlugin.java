@@ -23,57 +23,66 @@ public class WrappedPlugin {
     }
 
     private void load() {
-        File originalJar = new File(dataFolder, config.originalJarPath());
-        File patchedJar = new File(dataFolder, config.patchedJarPath());
+        File jarToLoad = prepareJarToLoad();
+        if (jarToLoad != null) {
+            this.bukkitPlugin = pluginLoader.loadPlugin(config.name(), jarToLoad);
+            if (this.bukkitPlugin == null) {
+                logger.severe("[Phantom][" + config.name() + "] Failed to load the plugin JAR: " + jarToLoad.getAbsolutePath());
+            }
+        }
+    }
 
+    private File prepareJarToLoad() {
+        File originalJar = new File(dataFolder, config.originalJarPath());
         logger.info("[Phantom][" + config.name() + "] Processing plugin. Original JAR: " + originalJar.getAbsolutePath());
 
-        if (!originalJar.getParentFile().exists()) {
-            if (!originalJar.getParentFile().mkdirs()) {
-                logger.warning("[Phantom][" + config.name() + "] Failed to create directory for original JAR: " + originalJar.getParentFile());
-                // Continue if possible, maybe JAR is in root of plugins
-            }
-        }
-        if (!originalJar.exists()) {
-            logger.severe("[Phantom][" + config.name() + "] ERROR: Original JAR file not found: " + originalJar.getPath());
-            return;
+        if (!ensureDirectoryExists(originalJar.getParentFile()) || !originalJar.exists()) {
+            logger.severe("[Phantom][" + config.name() + "] ERROR: Original JAR file not found at " + originalJar.getPath());
+            return null;
         }
 
-        File jarToLoad;
         if (config.foliaEnabled()) {
-            if (!patchedJar.getParentFile().exists()) {
-                if (!patchedJar.getParentFile().mkdirs()) {
-                     logger.warning("[Phantom][" + config.name() + "] Failed to create directory for patched JAR: " + patchedJar.getParentFile());
-                }
-            }
-            // Check if patched JAR needs (re)generation
-            if (!patchedJar.exists() || originalJar.lastModified() > patchedJar.lastModified()) {
-                logger.info("[Phantom][" + config.name() + "] Generating Folia-supported JAR...");
-                try {
-                    JarPatcher.createFoliaSupportedJar(originalJar, patchedJar); // Static call
-                    logger.info("[Phantom][" + config.name() + "] Folia-supported JAR generated: " + patchedJar.length() + " bytes");
-                    jarToLoad = patchedJar;
-                } catch (Exception e) {
-                    logger.severe("[Phantom][" + config.name() + "] Failed to create patched JAR: " + e.getMessage());
-                    e.printStackTrace();
-                    // Fallback to original JAR on patching failure
-                    logger.warning("[Phantom][" + config.name() + "] Falling back to original JAR.");
-                    jarToLoad = originalJar;
-                }
-            } else {
-                logger.info("[Phantom][" + config.name() + "] Using existing patched JAR: " + patchedJar.getAbsolutePath());
-                jarToLoad = patchedJar;
-            }
+            return createPatchedJar(originalJar);
         } else {
             logger.info("[Phantom][" + config.name() + "] Folia patching disabled. Using original JAR.");
-            jarToLoad = originalJar;
+            return originalJar;
+        }
+    }
+
+    private File createPatchedJar(File originalJar) {
+        File patchedJar = new File(dataFolder, config.patchedJarPath());
+        if (!ensureDirectoryExists(patchedJar.getParentFile())) {
+            logger.warning("[Phantom][" + config.name() + "] Could not create directory for patched JAR. Falling back to original JAR.");
+            return originalJar;
         }
 
-        this.bukkitPlugin = pluginLoader.loadPlugin(config.name(), jarToLoad);
-        if (this.bukkitPlugin == null) {
-            logger.severe("[Phantom][" + config.name() + "] Failed to load the plugin JAR: " + jarToLoad.getAbsolutePath());
-            // pluginLoader.loadPlugin already logs details and attempts cleanup of its own classloader for this pluginName
+        boolean needsPatching = !patchedJar.exists() || originalJar.lastModified() > patchedJar.lastModified();
+        if (needsPatching) {
+            logger.info("[Phantom][" + config.name() + "] Generating Folia-supported JAR...");
+            try {
+                JarPatcher.createFoliaSupportedJar(originalJar, patchedJar);
+                logger.info("[Phantom][" + config.name() + "] Folia-supported JAR generated: " + patchedJar.length() + " bytes");
+                return patchedJar;
+            } catch (Exception e) {
+                logger.severe("[Phantom][" + config.name() + "] Failed to create patched JAR: " + e.getMessage());
+                e.printStackTrace();
+                logger.warning("[Phantom][" + config.name() + "] Falling back to original JAR.");
+                return originalJar; // Fallback to original
+            }
+        } else {
+            logger.info("[Phantom][" + config.name() + "] Using existing patched JAR: " + patchedJar.getAbsolutePath());
+            return patchedJar;
         }
+    }
+
+    private boolean ensureDirectoryExists(File directory) {
+        if (!directory.exists()) {
+            if (!directory.mkdirs()) {
+                logger.warning("[Phantom][" + config.name() + "] Failed to create directory: " + directory.getAbsolutePath());
+                return false;
+            }
+        }
+        return true;
     }
 
     public Plugin getBukkitPlugin() {

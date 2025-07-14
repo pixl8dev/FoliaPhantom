@@ -133,10 +133,6 @@ public class FoliaPhantom extends JavaPlugin {
     }
 
     /**
-     * 生成した各 URLClassLoader を閉じる
-     */
-
-    /**
      * Detects the server type by checking for the existence of a Folia-specific class.
      * This method is called during onLoad to determine if Folia-specific APIs are available.
      * @return true if a Folia-specific class (io.papermc.paper.threadedregions.RegionizedServer) is found, false otherwise.
