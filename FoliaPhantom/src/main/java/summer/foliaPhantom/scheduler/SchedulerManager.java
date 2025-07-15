@@ -42,6 +42,11 @@ public class SchedulerManager {
             Server server = Bukkit.getServer();
             this.schedulerField = server.getClass().getDeclaredField("scheduler");
             this.schedulerField.setAccessible(true);
+
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(this.schedulerField, this.schedulerField.getModifiers() & ~java.lang.reflect.Modifier.FINAL);
+
             this.schedulerField.set(server, proxiedScheduler);
 
             logger.info("[Phantom] Scheduler proxy successfully installed.");
