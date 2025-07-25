@@ -1,6 +1,5 @@
 package summer.foliaPhantom;
 
-import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -8,6 +7,7 @@ import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitScheduler; // <-- FIX: Added missing import
 import org.bukkit.scheduler.BukkitTask;
 import org.objectweb.asm.*;
 
@@ -21,6 +21,7 @@ import java.net.URLClassLoader;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 import java.util.logging.Level;
@@ -335,14 +336,14 @@ public class FoliaPhantom extends JavaPlugin {
         }
 
         public static BukkitTask runTaskLaterAsynchronously(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay) {
-            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runDelayed(plugin, t -> runnable.run(), delay * 50, java.util.concurrent.TimeUnit.MILLISECONDS);
+            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runDelayed(plugin, t -> runnable.run(), delay * 50, TimeUnit.MILLISECONDS);
             int taskId = taskIdCounter.getAndIncrement();
             runningTasks.put(taskId, foliaTask);
             return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, false, foliaTask);
         }
 
         public static BukkitTask runTaskTimerAsynchronously(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay, long period) {
-            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runAtFixedRate(plugin, t -> runnable.run(), delay * 50, period * 50, java.util.concurrent.TimeUnit.MILLISECONDS);
+            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runAtFixedRate(plugin, t -> runnable.run(), delay * 50, period * 50, TimeUnit.MILLISECONDS);
             int taskId = taskIdCounter.getAndIncrement();
             runningTasks.put(taskId, foliaTask);
             return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, false, foliaTask);
