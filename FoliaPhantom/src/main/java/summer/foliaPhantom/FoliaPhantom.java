@@ -6,6 +6,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
 import org.objectweb.asm.*;
@@ -14,9 +15,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,6 @@ import java.util.logging.Level;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
-import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * FoliaPhantom - 高性能バイトコードパッチ方式（JAR再パッケージング版）
@@ -108,17 +108,34 @@ public class FoliaPhantom extends JavaPlugin {
                 zos.putNextEntry(new ZipEntry(entry.getName()));
 
                 if (!entry.isDirectory()) {
-                    if (entry.getName().endsWith(".class")) {
+                    if (entry.getName().equals("plugin.yml")) {
+                        // plugin.ymlを読み込み、folia-supportedフラグを追加/修正して書き込む
+                        String originalYml = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                        String modifiedYml = addFoliaSupportedFlag(originalYml);
+                        zos.write(modifiedYml.getBytes(StandardCharsets.UTF_8));
+                    } else if (entry.getName().endsWith(".class")) {
+                        // .classファイルを変換して書き込む
                         byte[] originalBytes = zis.readAllBytes();
                         byte[] transformedBytes = TRANSFORMER.transform(originalBytes);
                         zos.write(transformedBytes);
                     } else {
-                        // 他のファイルはそのままコピー
+                        // その他のファイルはそのままコピー
                         copyStream(zis, zos);
                     }
                 }
                 zos.closeEntry();
             }
+        }
+    }
+
+    private String addFoliaSupportedFlag(String pluginYml) {
+        // 既に 'folia-supported' キーが存在するかどうかをチェック
+        if (pluginYml.lines().anyMatch(line -> line.trim().startsWith("folia-supported:"))) {
+            // 存在する場合、その値を 'true' に書き換える
+            return pluginYml.replaceAll("(?m)^\\s*folia-supported:.*$", "folia-supported: true");
+        } else {
+            // 存在しない場合、ファイルの末尾に追加する
+            return pluginYml.trim() + "\nfolia-supported: true\n";
         }
     }
 
