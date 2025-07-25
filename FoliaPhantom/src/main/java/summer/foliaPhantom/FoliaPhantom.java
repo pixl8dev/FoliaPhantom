@@ -7,7 +7,7 @@ import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitScheduler; // <-- FIX: Added missing import
+import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
 import org.objectweb.asm.*;
 
@@ -48,8 +48,13 @@ public class FoliaPhantom extends JavaPlugin {
         }
 
         for (Map<?, ?> config : wrappedList) {
-            String name = config.getOrDefault("name", "UnknownPlugin").toString();
-            String jarPath = config.getOrDefault("original-jar-path", "").toString();
+            // FIX: Handle Map<?, ?> safely to avoid "incompatible types" error.
+            Object nameObj = config.get("name");
+            String name = (nameObj != null) ? nameObj.toString() : "UnknownPlugin";
+
+            Object jarPathObj = config.get("original-jar-path");
+            String jarPath = (jarPathObj != null) ? jarPathObj.toString() : "";
+
             if (jarPath.isEmpty()) {
                 getLogger().severe(String.format("[Phantom][%s] 'original-jar-path' が未設定です。スキップします。", name));
                 continue;
@@ -132,6 +137,7 @@ public class FoliaPhantom extends JavaPlugin {
             this.classLoader = new PatchingClassLoader(new URL[]{pluginJar.toURI().toURL()}, phantom.getClass().getClassLoader());
         }
 
+        @SuppressWarnings("deprecation") // FIX: Suppress warning for getPluginLoader(), as it's necessary for this use case.
         public Plugin loadPlugin() throws Exception {
             PluginDescriptionFile desc = phantom.getPluginLoader().getPluginDescription(pluginJar);
             File dataFolder = new File(phantom.getDataFolder().getParentFile(), desc.getName());
@@ -320,7 +326,8 @@ public class FoliaPhantom extends JavaPlugin {
              Location loc = getFallbackLocation();
              ScheduledTask foliaTask = loc != null
                 ? Bukkit.getRegionScheduler().runAtFixedRate(plugin, loc, t -> runnable.run(), Math.max(1, delay), Math.max(1, period))
-                : Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, loc, t -> runnable.run(), Math.max(1, delay), Math.max(1, period));
+                // FIX: Removed the 'loc' argument from the GlobalRegionScheduler call, as it does not take a location.
+                : Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> runnable.run(), Math.max(1, delay), Math.max(1, period));
              int taskId = taskIdCounter.getAndIncrement();
              runningTasks.put(taskId, foliaTask);
              return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, true, foliaTask);
