@@ -48,7 +48,7 @@ public class FoliaPhantom extends JavaPlugin {
         }
 
         for (Map<?, ?> config : wrappedList) {
-            // FIX: Handle Map<?, ?> safely to avoid "incompatible types" error.
+            // Handle Map<?, ?> safely to avoid "incompatible types" error.
             Object nameObj = config.get("name");
             String name = (nameObj != null) ? nameObj.toString() : "UnknownPlugin";
 
@@ -137,7 +137,7 @@ public class FoliaPhantom extends JavaPlugin {
             this.classLoader = new PatchingClassLoader(new URL[]{pluginJar.toURI().toURL()}, phantom.getClass().getClassLoader());
         }
 
-        @SuppressWarnings("deprecation") // FIX: Suppress warning for getPluginLoader(), as it's necessary for this use case.
+        @SuppressWarnings("deprecation") // Suppress warning for getPluginLoader(), as it's necessary for this use case.
         public Plugin loadPlugin() throws Exception {
             PluginDescriptionFile desc = phantom.getPluginLoader().getPluginDescription(pluginJar);
             File dataFolder = new File(phantom.getDataFolder().getParentFile(), desc.getName());
@@ -220,6 +220,15 @@ public class FoliaPhantom extends JavaPlugin {
                         return definedClass;
                     } catch (Throwable e) {
                         phantom.getLogger().log(Level.WARNING, String.format("[%s] クラス '%s' の変換に失敗しました。オリジナルのクラスをロードします。", pluginName, name), e);
+                        // 変換に失敗した場合、元のバイトコードでクラスを定義しようと試みる
+                        try (InputStream is = getResourceAsStream(name.replace('.', '/') + ".class")) {
+                            if (is != null) {
+                                byte[] originalBytes = is.readAllBytes();
+                                return defineClass(name, originalBytes, 0, originalBytes.length);
+                            }
+                        } catch (IOException ioEx) {
+                           //
+                        }
                         return super.loadClass(name, resolve);
                     }
                 }
@@ -233,7 +242,8 @@ public class FoliaPhantom extends JavaPlugin {
     private static class SchedulerClassTransformer {
         public byte[] transform(byte[] originalBytes) {
             ClassReader cr = new ClassReader(originalBytes);
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+            // FIX: COMPUTE_FRAMESからCOMPUTE_MAXSに変更して、クラスパスの依存関係問題を回避する
+            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             ClassVisitor cv = new SchedulerClassVisitor(cw);
             cr.accept(cv, ClassReader.EXPAND_FRAMES);
             return cw.toByteArray();
@@ -326,7 +336,6 @@ public class FoliaPhantom extends JavaPlugin {
              Location loc = getFallbackLocation();
              ScheduledTask foliaTask = loc != null
                 ? Bukkit.getRegionScheduler().runAtFixedRate(plugin, loc, t -> runnable.run(), Math.max(1, delay), Math.max(1, period))
-                // FIX: Removed the 'loc' argument from the GlobalRegionScheduler call, as it does not take a location.
                 : Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> runnable.run(), Math.max(1, delay), Math.max(1, period));
              int taskId = taskIdCounter.getAndIncrement();
              runningTasks.put(taskId, foliaTask);
