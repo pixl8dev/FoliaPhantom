@@ -5,11 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.InvalidPluginException;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.plugin.java.JavaPluginLoader;
-import org.bukkit.plugin.java.PluginClassLoader;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
 import org.objectweb.asm.*;
@@ -17,10 +13,11 @@ import org.objectweb.asm.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,21 +25,31 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 import java.util.logging.Level;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
+import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * FoliaPhantom - 高性能バイトコードパッチ方式
+ * FoliaPhantom - 高性能バイトコードパッチ方式（JAR再パッケージング版）
  * 全ての機能を単一ファイルに統合したバージョン。
- * ランタイムパッチシステムの概念を、より堅牢なバイトコード変換アプローチで実現します。
+ * サーバー起動時にパッチ済みの一時JARを生成し、公式ローダーにロードさせることで問題を解決します。
  */
 public class FoliaPhantom extends JavaPlugin {
 
-    private final Map<String, Plugin> wrappedPlugins = new ConcurrentHashMap<>();
-    private final Map<String, PluginPatcher> patchers = new ConcurrentHashMap<>();
+    private final List<Plugin> wrappedPlugins = new ArrayList<>();
+    private final List<File> tempJarFiles = new ArrayList<>();
+    private static final SchedulerClassTransformer TRANSFORMER = new SchedulerClassTransformer();
 
     @Override
     public void onLoad() {
-        getLogger().info("[Phantom] === FoliaPhantom onLoad (High-Performance Single-File) ===");
+        getLogger().info("[Phantom] === FoliaPhantom onLoad (JAR Repackaging) ===");
         saveDefaultConfig();
+
+        File tempDir = new File(getDataFolder(), "temp-jars");
+        if (!tempDir.exists()) {
+            tempDir.mkdirs();
+        }
 
         List<Map<?, ?>> wrappedList = getConfig().getMapList("wrapped-plugins");
         if (wrappedList == null || wrappedList.isEmpty()) {
@@ -62,22 +69,28 @@ public class FoliaPhantom extends JavaPlugin {
                 continue;
             }
 
+            File originalJar = new File(getDataFolder(), jarPath);
+            if (!originalJar.exists()) {
+                getLogger().severe(String.format("[Phantom][%s] JARファイルが見つかりません: %s", name, originalJar.getAbsolutePath()));
+                continue;
+            }
+            
             try {
-                File pluginJar = new File(getDataFolder(), jarPath);
-                if (!pluginJar.exists()) {
-                    getLogger().severe(String.format("[Phantom][%s] JARファイルが見つかりません: %s", name, pluginJar.getAbsolutePath()));
-                    continue;
-                }
+                // 一時的なパッチ済みJARを作成
+                File tempJar = File.createTempFile("phantom-" + name + "-", ".jar", tempDir);
+                tempJarFiles.add(tempJar);
 
-                PluginPatcher patcher = new PluginPatcher(this, name, pluginJar);
-                patchers.put(name, patcher);
+                getLogger().info(String.format("[Phantom][%s] Creating patched JAR at: %s", name, tempJar.getPath()));
+                createPatchedJar(originalJar.toPath(), tempJar.toPath());
 
-                Plugin plugin = patcher.loadPlugin();
+                // パッチ済みJARをロード
+                PluginManager pluginManager = Bukkit.getPluginManager();
+                Plugin plugin = pluginManager.loadPlugin(tempJar);
                 if (plugin != null) {
-                    wrappedPlugins.put(name, plugin);
-                    getLogger().info(String.format("[Phantom][%s] パッチ適用とロードが完了しました。", name));
+                    wrappedPlugins.add(plugin);
+                    getLogger().info(String.format("[Phantom][%s] Patched plugin loaded successfully.", name));
                 } else {
-                    getLogger().severe(String.format("[Phantom][%s] プラグインのロードに失敗しました。", name));
+                     getLogger().severe(String.format("[Phantom][%s] Failed to load the patched plugin.", name));
                 }
             } catch (Exception e) {
                 getLogger().log(Level.SEVERE, String.format("[Phantom][%s] ロード処理中に致命的なエラーが発生しました。", name), e);
@@ -85,157 +98,80 @@ public class FoliaPhantom extends JavaPlugin {
         }
     }
 
+    private void createPatchedJar(Path source, Path destination) throws IOException {
+        try (
+            ZipInputStream zis = new ZipInputStream(Files.newInputStream(source));
+            ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(destination))
+        ) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                zos.putNextEntry(new ZipEntry(entry.getName()));
+
+                if (!entry.isDirectory()) {
+                    if (entry.getName().endsWith(".class")) {
+                        byte[] originalBytes = zis.readAllBytes();
+                        byte[] transformedBytes = TRANSFORMER.transform(originalBytes);
+                        zos.write(transformedBytes);
+                    } else {
+                        // 他のファイルはそのままコピー
+                        copyStream(zis, zos);
+                    }
+                }
+                zos.closeEntry();
+            }
+        }
+    }
+
+    private void copyStream(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[8192];
+        int len;
+        while ((len = in.read(buffer)) > 0) {
+            out.write(buffer, 0, len);
+        }
+    }
+
     @Override
     public void onEnable() {
         getLogger().info("[Phantom] === FoliaPhantom onEnable ===");
-        wrappedPlugins.forEach((name, plugin) -> {
+        for (Plugin plugin : wrappedPlugins) {
             if (plugin != null && !plugin.isEnabled()) {
-                getLogger().info(String.format("[Phantom][%s] Enabling patched plugin...", name));
+                getLogger().info(String.format("[Phantom][%s] Enabling patched plugin...", plugin.getName()));
                 getServer().getPluginManager().enablePlugin(plugin);
             }
-        });
+        }
         getLogger().info("[Phantom] 全てのパッチ済みプラグインを有効化しました。");
     }
 
     @Override
     public void onDisable() {
         getLogger().info("[Phantom] === FoliaPhantom onDisable ===");
-        wrappedPlugins.values().forEach(plugin -> {
-            if (plugin != null && plugin.isEnabled()) {
-                getServer().getPluginManager().disablePlugin(plugin);
-            }
-        });
+        // プラグインはBukkitが管理するので、アンロードは不要。
         wrappedPlugins.clear();
 
-        patchers.values().forEach(patcher -> {
-            try {
-                patcher.close();
-            } catch (Exception e) {
-                // ignore
+        // 一時ファイルをクリーンアップ
+        getLogger().info("[Phantom] Cleaning up temporary files...");
+        for (File file : tempJarFiles) {
+            if (file.exists() && !file.delete()) {
+                getLogger().warning("[Phantom] Could not delete temporary file: " + file.getPath());
+                file.deleteOnExit();
             }
-        });
-        patchers.clear();
+        }
+        tempJarFiles.clear();
         getLogger().info("[Phantom] FoliaPhantom has been disabled.");
     }
 
-    // --- Nested Classes ---
-
-    private static class PluginPatcher implements AutoCloseable {
-        private final FoliaPhantom phantom;
-        private final String pluginName;
-        private final File pluginJar;
-        private TransformingPluginClassLoader classLoader;
-
-        public PluginPatcher(FoliaPhantom phantom, String pluginName, File pluginJar) {
-            this.phantom = phantom;
-            this.pluginName = pluginName;
-            this.pluginJar = pluginJar;
-        }
-
-        @SuppressWarnings("deprecation")
-        public Plugin loadPlugin() throws Exception {
-            PluginDescriptionFile desc = phantom.getPluginLoader().getPluginDescription(pluginJar);
-            File dataFolder = new File(phantom.getDataFolder().getParentFile(), desc.getName());
-            dataFolder.mkdirs();
-
-            this.classLoader = new TransformingPluginClassLoader(
-                    (JavaPluginLoader) phantom.getPluginLoader(),
-                    phantom.getClass().getClassLoader(),
-                    desc,
-                    pluginName
-            );
-
-            Class<?> mainClass = classLoader.loadClass(desc.getMain());
-            Class<? extends JavaPlugin> pluginClass = mainClass.asSubclass(JavaPlugin.class);
-
-            Constructor<? extends JavaPlugin> constructor = pluginClass.getDeclaredConstructor();
-            constructor.setAccessible(true);
-            JavaPlugin instance = constructor.newInstance();
-
-            // PluginClassLoader が classLoader フィールドを初期化するので、手動での設定は不要。
-            // しかし、他のフィールドは手動で設定する必要がある。
-            initPluginField(instance, "server", phantom.getServer());
-            initPluginField(instance, "dataFolder", dataFolder);
-            // onLoadを呼び出す（JavaPluginLoaderのロジックを模倣）
-            instance.onLoad();
-
-            return instance;
-        }
-
-        private void initPluginField(JavaPlugin plugin, String fieldName, Object value) {
-            try {
-                Field field = JavaPlugin.class.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                field.set(plugin, value);
-            } catch (NoSuchFieldException | IllegalAccessException e) {
-                phantom.getLogger().log(Level.WARNING, "Failed to initialize field " + fieldName + " for " + pluginName, e);
-            }
-        }
-
-        @Override
-        public void close() throws IOException {
-            if (classLoader != null) {
-                classLoader.close();
-            }
-        }
-    }
-
-    // FIX: URLClassLoaderではなくPluginClassLoaderを継承する
-    private static class TransformingPluginClassLoader extends PluginClassLoader {
-        private static final SchedulerClassTransformer TRANSFORMER = new SchedulerClassTransformer();
-        private final String pluginName;
-        private final Map<String, Class<?>> transformedCache = new ConcurrentHashMap<>();
-
-        public TransformingPluginClassLoader(JavaPluginLoader loader, ClassLoader parent, PluginDescriptionFile description, String pluginName) throws InvalidPluginException, MalformedURLException {
-            super(loader, parent, description);
-            this.pluginName = pluginName;
-        }
-
-        @Override
-        protected Class<?> findClass(String name) throws ClassNotFoundException {
-            // すでにロード済みの場合はキャッシュから返す
-             if (transformedCache.containsKey(name)) {
-                return transformedCache.get(name);
-            }
-            
-            // 変換対象外のクラスは親（PluginClassLoader）に任せる
-            if (name.startsWith("java.") || name.startsWith("org.bukkit.") || name.startsWith("io.papermc.") || name.startsWith("com.destroystokyo.paper.") || name.startsWith("net.minecraft.")) {
-                return super.findClass(name);
-            }
-
-            String path = name.replace('.', '/').concat(".class");
-            try (InputStream is = this.getResourceAsStream(path)) {
-                if (is == null) {
-                    // 親に任せる
-                    return super.findClass(name);
-                }
-                byte[] originalBytes = is.readAllBytes();
-                byte[] transformedBytes = TRANSFORMER.transform(originalBytes);
-                
-                if (originalBytes.length != transformedBytes.length) {
-                    Bukkit.getLogger().info(String.format("[Phantom][%s] Patched class: %s", pluginName, name));
-                }
-
-                Class<?> definedClass = defineClass(name, transformedBytes, 0, transformedBytes.length);
-                transformedCache.put(name, definedClass);
-                return definedClass;
-
-            } catch (Throwable e) {
-                Bukkit.getLogger().log(Level.WARNING, String.format("[Phantom][%s] クラス '%s' の変換に失敗しました。オリジナルのクラスをロードします。", pluginName, name), e);
-                // 変換に失敗した場合、フォールバックとして親のfindClassを呼び出す
-                return super.findClass(name);
-            }
-        }
-    }
-
-
     private static class SchedulerClassTransformer {
         public byte[] transform(byte[] originalBytes) {
-            ClassReader cr = new ClassReader(originalBytes);
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-            ClassVisitor cv = new SchedulerClassVisitor(cw);
-            cr.accept(cv, ClassReader.EXPAND_FRAMES);
-            return cw.toByteArray();
+            try {
+                ClassReader cr = new ClassReader(originalBytes);
+                ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                ClassVisitor cv = new SchedulerClassVisitor(cw);
+                cr.accept(cv, ClassReader.EXPAND_FRAMES);
+                return cw.toByteArray();
+            } catch (Exception e) {
+                // 変換に失敗した場合は元のバイトコードを返す
+                return originalBytes;
+            }
         }
 
         private static class SchedulerClassVisitor extends ClassVisitor {
@@ -288,8 +224,6 @@ public class FoliaPhantom extends JavaPlugin {
                 task.cancel();
             }
         }
-
-        // --- Replacement Methods ---
         
         public static BukkitTask runTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable) {
             Location loc = getFallbackLocation();
