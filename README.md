@@ -1,5 +1,5 @@
 # FoliaPhantom
-
+![ロゴ](logo.png)
 **日本語 (Japanese)** | [English](#english)
 
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
