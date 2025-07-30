@@ -16,12 +16,18 @@ import java.util.logging.Level;
 
 public class FoliaPhantom extends JavaPlugin {
 
+    private static FoliaPhantom instance;
     private final List<Plugin> wrappedPlugins = new ArrayList<>();
     private final List<File> tempJarFiles = new ArrayList<>();
     private PluginPatcher pluginPatcher;
 
+    public static FoliaPhantom getInstance() {
+        return instance;
+    }
+
     @Override
     public void onLoad() {
+        instance = this;
         getLogger().info("[Phantom] === FoliaPhantom onLoad (JAR Repackaging) ===");
         saveDefaultConfig();
         this.pluginPatcher = new PluginPatcher(getLogger());

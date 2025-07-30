@@ -41,10 +41,18 @@ public class WorldGenClassTransformer {
         public WorldGenMethodVisitor(MethodVisitor mv) { super(Opcodes.ASM9, mv); }
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean isInterface) {
-            if (owner.endsWith("Plugin") && "getDefaultWorldGenerator".equals(name) && "(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;".equals(desc)) {
-                String newDesc = "(Lorg/bukkit/plugin/Plugin;Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;";
-                super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
-                return;
+            if (FoliaPatcher.REPLACEMENT_MAP.containsKey(name + desc)) {
+                String newDesc = null;
+                if ("createWorld".equals(name) && "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;".equals(desc) && opcode == Opcodes.INVOKEINTERFACE) {
+                    newDesc = "(Lorg/bukkit/Server;Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;";
+                } else if ("getDefaultWorldGenerator".equals(name) && "(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;".equals(desc)) {
+                    newDesc = "(Lorg/bukkit/plugin/Plugin;Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;";
+                }
+
+                if (newDesc != null) {
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
+                    return;
+                }
             }
             super.visitMethodInsn(opcode, owner, name, desc, isInterface);
         }

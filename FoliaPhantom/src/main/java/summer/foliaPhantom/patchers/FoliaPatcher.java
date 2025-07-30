@@ -7,6 +7,7 @@ import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
+import summer.foliaPhantom.FoliaPhantom;
 
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ public final class FoliaPatcher {
     static {
         // World Generation related methods
         REPLACEMENT_MAP.put("getDefaultWorldGenerator(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;", true);
+        REPLACEMENT_MAP.put("createWorld(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;", true);
     }
 
     private FoliaPatcher() {}
@@ -50,6 +52,19 @@ public final class FoliaPatcher {
         org.bukkit.generator.ChunkGenerator originalGenerator = plugin.getDefaultWorldGenerator(worldName, id);
         if (originalGenerator == null) return null;
         return new FoliaChunkGenerator(originalGenerator);
+    }
+
+    public static World createWorld(org.bukkit.Server server, org.bukkit.WorldCreator creator) {
+        System.out.println("[Phantom] Intercepted createWorld call. Dispatching to Bukkit scheduler and waiting for completion...");
+        try {
+            return Bukkit.getScheduler().callSyncMethod(FoliaPhantom.getInstance(), () -> {
+                return server.createWorld(creator);
+            }).get();
+        } catch (Exception e) {
+            System.err.println("[Phantom] Failed to create world via Bukkit scheduler.");
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public static class FoliaChunkGenerator extends org.bukkit.generator.ChunkGenerator {
