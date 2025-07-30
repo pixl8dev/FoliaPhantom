@@ -39,11 +39,12 @@ public class FoliaPhantom extends JavaPlugin {
 
     private final List<Plugin> wrappedPlugins = new ArrayList<>();
     private final List<File> tempJarFiles = new ArrayList<>();
-    private static final SchedulerClassTransformer TRANSFORMER = new SchedulerClassTransformer();
+    private SchedulerClassTransformer transformer;
 
     @Override
     public void onLoad() {
         getLogger().info("[Phantom] === FoliaPhantom onLoad (JAR Repackaging) ===");
+        this.transformer = new SchedulerClassTransformer(getLogger());
         saveDefaultConfig();
 
         File tempDir = new File(getDataFolder(), "temp-jars");
@@ -116,7 +117,7 @@ public class FoliaPhantom extends JavaPlugin {
                     } else if (entry.getName().endsWith(".class")) {
                         // .classファイルを変換して書き込む
                         byte[] originalBytes = zis.readAllBytes();
-                        byte[] transformedBytes = TRANSFORMER.transform(originalBytes);
+                        byte[] transformedBytes = transformer.transform(originalBytes);
                         zos.write(transformedBytes);
                     } else {
                         // その他のファイルはそのままコピー
@@ -178,15 +179,24 @@ public class FoliaPhantom extends JavaPlugin {
     }
 
     private static class SchedulerClassTransformer {
+        // We can't get the logger directly, so we pass it from the main class.
+        private final java.util.logging.Logger logger;
+
+        public SchedulerClassTransformer(java.util.logging.Logger logger) {
+            this.logger = logger;
+        }
+
         public byte[] transform(byte[] originalBytes) {
+            String className = "Unknown";
             try {
                 ClassReader cr = new ClassReader(originalBytes);
+                className = cr.getClassName();
                 ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
                 ClassVisitor cv = new SchedulerClassVisitor(cw);
                 cr.accept(cv, ClassReader.EXPAND_FRAMES);
                 return cw.toByteArray();
             } catch (Exception e) {
-                // 変換に失敗した場合は元のバイトコードを返す
+                logger.log(Level.WARNING, "[Phantom] Failed to transform class " + className + ". Returning original bytes.", e);
                 return originalBytes;
             }
         }
@@ -200,13 +210,15 @@ public class FoliaPhantom extends JavaPlugin {
         }
 
         private static class SchedulerMethodVisitor extends MethodVisitor {
+            private static final String PATCHER_INTERNAL_NAME = Type.getInternalName(FoliaPatcher.class);
+
             public SchedulerMethodVisitor(MethodVisitor mv) { super(Opcodes.ASM9, mv); }
             @Override
             public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean isInterface) {
                 if (opcode == Opcodes.INVOKEINTERFACE && "org/bukkit/scheduler/BukkitScheduler".equals(owner)) {
                     String newDesc = "(Lorg/bukkit/scheduler/BukkitScheduler;" + desc.substring(1);
                     if (FoliaPatcher.REPLACEMENT_MAP.containsKey(name + desc)) {
-                        super.visitMethodInsn(Opcodes.INVOKESTATIC, "summer/foliaPhantom/FoliaPhantom$FoliaPatcher", name, newDesc, false);
+                        super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
                         return;
                     }
                 }
@@ -225,14 +237,33 @@ public class FoliaPhantom extends JavaPlugin {
             Map.entry("runTaskTimer(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)Lorg/bukkit/scheduler/BukkitTask;", true),
             Map.entry("runTaskAsynchronously(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;)Lorg/bukkit/scheduler/BukkitTask;", true),
             Map.entry("runTaskLaterAsynchronously(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;J)Lorg/bukkit/scheduler/BukkitTask;", true),
-            Map.entry("runTaskTimerAsynchronously(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)Lorg/bukkit/scheduler/BukkitTask;", true)
+            Map.entry("runTaskTimerAsynchronously(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)Lorg/bukkit/scheduler/BukkitTask;", true),
+            // Legacy methods returning int
+            Map.entry("scheduleSyncDelayedTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;J)I", true),
+            Map.entry("scheduleSyncRepeatingTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)I", true),
+            Map.entry("scheduleAsyncDelayedTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;J)I", true),
+            Map.entry("scheduleAsyncRepeatingTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)I", true),
+            // Cancel tasks
+            Map.entry("cancelTask(I)V", true),
+            Map.entry("cancelTasks(Lorg/bukkit/plugin/Plugin;)V", true),
+            Map.entry("cancelAllTasks()V", true)
         );
 
         private FoliaPatcher() {}
 
         private static Location getFallbackLocation() {
+            // Try to get the main overworld first.
+            World mainWorld = Bukkit.getWorld("world");
+            if (mainWorld != null) {
+                return mainWorld.getSpawnLocation();
+            }
+            // Fallback to the first loaded world if the main world is not available.
             List<World> worlds = Bukkit.getWorlds();
-            return worlds.isEmpty() ? null : worlds.get(0).getSpawnLocation();
+            if (!worlds.isEmpty()) {
+                return worlds.get(0).getSpawnLocation();
+            }
+            // Return null if no worlds are loaded.
+            return null;
         }
 
         private static void cancelTaskById(int taskId) {
@@ -241,23 +272,38 @@ public class FoliaPhantom extends JavaPlugin {
                 task.cancel();
             }
         }
+
+        private static Runnable wrapRunnable(Runnable original, int taskId, boolean isRepeating) {
+            if (isRepeating) {
+                return original; // For repeating tasks, cleanup is done only on cancellation.
+            }
+            return () -> {
+                try {
+                    original.run();
+                } finally {
+                    runningTasks.remove(taskId);
+                }
+            };
+        }
         
         public static BukkitTask runTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable) {
+            int taskId = taskIdCounter.getAndIncrement();
+            Runnable wrappedRunnable = wrapRunnable(runnable, taskId, false);
             Location loc = getFallbackLocation();
             ScheduledTask foliaTask = loc != null
-                ? Bukkit.getRegionScheduler().run(plugin, loc, t -> runnable.run())
-                : Bukkit.getGlobalRegionScheduler().run(plugin, t -> runnable.run());
-            int taskId = taskIdCounter.getAndIncrement();
+                ? Bukkit.getRegionScheduler().run(plugin, loc, t -> wrappedRunnable.run())
+                : Bukkit.getGlobalRegionScheduler().run(plugin, t -> wrappedRunnable.run());
             runningTasks.put(taskId, foliaTask);
             return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, true, foliaTask);
         }
 
         public static BukkitTask runTaskLater(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay) {
+            int taskId = taskIdCounter.getAndIncrement();
+            Runnable wrappedRunnable = wrapRunnable(runnable, taskId, false);
             Location loc = getFallbackLocation();
             ScheduledTask foliaTask = loc != null
-                ? Bukkit.getRegionScheduler().runDelayed(plugin, loc, t -> runnable.run(), Math.max(1, delay))
-                : Bukkit.getGlobalRegionScheduler().runDelayed(plugin, t -> runnable.run(), Math.max(1, delay));
-            int taskId = taskIdCounter.getAndIncrement();
+                ? Bukkit.getRegionScheduler().runDelayed(plugin, loc, t -> wrappedRunnable.run(), Math.max(1, delay))
+                : Bukkit.getGlobalRegionScheduler().runDelayed(plugin, t -> wrappedRunnable.run(), Math.max(1, delay));
             runningTasks.put(taskId, foliaTask);
             return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, true, foliaTask);
         }
@@ -273,24 +319,70 @@ public class FoliaPhantom extends JavaPlugin {
         }
 
         public static BukkitTask runTaskAsynchronously(BukkitScheduler ignored, Plugin plugin, Runnable runnable) {
-            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runNow(plugin, t -> runnable.run());
             int taskId = taskIdCounter.getAndIncrement();
+            Runnable wrappedRunnable = wrapRunnable(runnable, taskId, false);
+            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runNow(plugin, t -> wrappedRunnable.run());
             runningTasks.put(taskId, foliaTask);
             return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, false, foliaTask);
         }
 
         public static BukkitTask runTaskLaterAsynchronously(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay) {
-            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runDelayed(plugin, t -> runnable.run(), delay * 50, TimeUnit.MILLISECONDS);
             int taskId = taskIdCounter.getAndIncrement();
+            Runnable wrappedRunnable = wrapRunnable(runnable, taskId, false);
+            // Note: Assumes a fixed 20 TPS (50ms per tick) for delay conversion.
+            ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runDelayed(plugin, t -> wrappedRunnable.run(), delay * 50, TimeUnit.MILLISECONDS);
             runningTasks.put(taskId, foliaTask);
             return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, false, foliaTask);
         }
 
         public static BukkitTask runTaskTimerAsynchronously(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay, long period) {
+            // Note: Assumes a fixed 20 TPS (50ms per tick) for delay and period conversion.
             ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runAtFixedRate(plugin, t -> runnable.run(), delay * 50, period * 50, TimeUnit.MILLISECONDS);
             int taskId = taskIdCounter.getAndIncrement();
             runningTasks.put(taskId, foliaTask);
             return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, false, foliaTask);
+        }
+
+        // --- Legacy Methods ---
+        public static int scheduleSyncDelayedTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay) {
+            return runTaskLater(ignored, plugin, runnable, delay).getTaskId();
+        }
+
+        public static int scheduleSyncRepeatingTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay, long period) {
+            return runTaskTimer(ignored, plugin, runnable, delay, period).getTaskId();
+        }
+
+        public static int scheduleAsyncDelayedTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay) {
+            return runTaskLaterAsynchronously(ignored, plugin, runnable, delay).getTaskId();
+        }
+
+        public static int scheduleAsyncRepeatingTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay, long period) {
+            return runTaskTimerAsynchronously(ignored, plugin, runnable, delay, period).getTaskId();
+        }
+
+        // --- Cancellation Methods ---
+        public static void cancelTask(BukkitScheduler ignored, int taskId) {
+            cancelTaskById(taskId);
+        }
+
+        public static void cancelTasks(BukkitScheduler ignored, Plugin plugin) {
+            runningTasks.entrySet().removeIf(entry -> {
+                ScheduledTask scheduledTask = entry.getValue();
+                boolean ownedByPlugin = scheduledTask.getOwningPlugin().equals(plugin);
+                if (ownedByPlugin && !scheduledTask.isCancelled()) {
+                    scheduledTask.cancel();
+                }
+                return ownedByPlugin; // remove if owned by the plugin
+            });
+        }
+
+        public static void cancelAllTasks() {
+            runningTasks.values().forEach(task -> {
+                if (!task.isCancelled()) {
+                    task.cancel();
+                }
+            });
+            runningTasks.clear();
         }
     }
 
