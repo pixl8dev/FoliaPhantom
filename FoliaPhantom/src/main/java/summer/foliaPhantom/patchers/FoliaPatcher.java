@@ -205,7 +205,7 @@ public final class FoliaPatcher {
     }
 
     public static BukkitTask runTaskTimerAsynchronously(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay, long period) {
-        ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runAtFixedRate(plugin, t -> runnable.run(), delay * 50, period * 50, TimeUnit.MILLISECONDS);
+        ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runAtFixedRate(plugin, t -> runnable.run(), Math.max(1, delay) * 50, Math.max(1, period) * 50, TimeUnit.MILLISECONDS);
         int taskId = taskIdCounter.getAndIncrement();
         runningTasks.put(taskId, foliaTask);
         return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, false, foliaTask);
