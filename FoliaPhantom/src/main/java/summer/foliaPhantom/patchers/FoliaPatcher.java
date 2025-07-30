@@ -42,6 +42,9 @@ public final class FoliaPatcher {
         // World Generation related methods
         REPLACEMENT_MAP.put("getDefaultWorldGenerator(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;", true);
         REPLACEMENT_MAP.put("createWorld(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;", true);
+        // BukkitRunnable
+        REPLACEMENT_MAP.put("runTaskTimerAsynchronously(Lorg/bukkit/plugin/Plugin;JJ)Lorg/bukkit/scheduler/BukkitTask;", true); // This is for BukkitScheduler
+        REPLACEMENT_MAP.put("runTaskTimerAsynchronously(Lorg/bukkit/plugin/Plugin;JJ)Lorg/bukkit/scheduler/BukkitTask;", true); // This is for BukkitRunnable, it has the same signature
     }
 
     private FoliaPatcher() {}
@@ -185,6 +188,11 @@ public final class FoliaPatcher {
         ScheduledTask foliaTask = Bukkit.getAsyncScheduler().runNow(plugin, t -> wrappedRunnable.run());
         runningTasks.put(taskId, foliaTask);
         return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, false, foliaTask);
+    }
+
+    public static BukkitTask runTaskTimerAsynchronously_onRunnable(org.bukkit.scheduler.BukkitRunnable runnable, Plugin plugin, long delay, long period) {
+        // This is the wrapper for BukkitRunnable calls
+        return runTaskTimerAsynchronously((BukkitScheduler) null, plugin, runnable, delay, period);
     }
 
     public static BukkitTask runTaskLaterAsynchronously(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay) {

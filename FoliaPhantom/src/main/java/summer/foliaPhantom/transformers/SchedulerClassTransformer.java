@@ -41,10 +41,19 @@ public class SchedulerClassTransformer {
         public SchedulerMethodVisitor(MethodVisitor mv) { super(Opcodes.ASM9, mv); }
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean isInterface) {
-            if (opcode == Opcodes.INVOKEINTERFACE && "org/bukkit/scheduler/BukkitScheduler".equals(owner)) {
-                String newDesc = "(Lorg/bukkit/scheduler/BukkitScheduler;" + desc.substring(1);
-                if (FoliaPatcher.REPLACEMENT_MAP.containsKey(name + desc)) {
+            String methodKey = name + desc;
+
+            if (FoliaPatcher.REPLACEMENT_MAP.containsKey(methodKey)) {
+                if ("org/bukkit/scheduler/BukkitScheduler".equals(owner) && opcode == Opcodes.INVOKEINTERFACE) {
+                    String newDesc = "(Lorg/bukkit/scheduler/BukkitScheduler;" + desc.substring(1);
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
+                    return;
+                }
+
+                if ("org/bukkit/scheduler/BukkitRunnable".equals(owner) && opcode == Opcodes.INVOKEVIRTUAL) {
+                    String newName = name + "_onRunnable";
+                    String newDesc = "(Lorg/bukkit/scheduler/BukkitRunnable;" + desc.substring(1);
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, newName, newDesc, false);
                     return;
                 }
             }
