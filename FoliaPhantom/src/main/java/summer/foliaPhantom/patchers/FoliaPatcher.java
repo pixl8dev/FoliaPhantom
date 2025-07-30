@@ -11,12 +11,12 @@ import summer.foliaPhantom.FoliaPhantom;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 
 public final class FoliaPatcher {
+    private static final ExecutorService worldGenExecutor = Executors.newSingleThreadExecutor();
     private static final AtomicInteger taskIdCounter = new AtomicInteger(Integer.MAX_VALUE / 2);
     private static final Map<Integer, ScheduledTask> runningTasks = new ConcurrentHashMap<>();
 
@@ -55,13 +55,13 @@ public final class FoliaPatcher {
     }
 
     public static World createWorld(org.bukkit.Server server, org.bukkit.WorldCreator creator) {
-        System.out.println("[Phantom] Intercepted createWorld call. Dispatching to Bukkit scheduler and waiting for completion...");
+        System.out.println("[Phantom] Intercepted createWorld call. Dispatching to dedicated world-gen thread and waiting for completion...");
+        Callable<World> task = () -> server.createWorld(creator);
+        Future<World> future = worldGenExecutor.submit(task);
         try {
-            return Bukkit.getScheduler().callSyncMethod(FoliaPhantom.getInstance(), () -> {
-                return server.createWorld(creator);
-            }).get();
-        } catch (Exception e) {
-            System.err.println("[Phantom] Failed to create world via Bukkit scheduler.");
+            return future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            System.err.println("[Phantom] Failed to create world via dedicated executor.");
             e.printStackTrace();
             return null;
         }
