@@ -27,13 +27,11 @@ public class PluginPatcher {
 
     public PluginPatcher(Logger logger) {
         this.logger = logger;
-        // Register all transformers here. Order matters.
-        // ThreadSafetyTransformer should run first to catch unsafe API calls
-        // before they might be altered by other transformers.
+        // Register all transformers here. Order is critical.
         this.transformers.add(new ThreadSafetyTransformer(logger));
-        this.transformers.add(new SchedulerClassTransformer(logger));
         this.transformers.add(new WorldGenClassTransformer(logger));
         this.transformers.add(new EntitySchedulerTransformer(logger));
+        this.transformers.add(new SchedulerClassTransformer(logger));
     }
 
     public void patchPlugin(File originalJar, File tempJar) throws IOException {
