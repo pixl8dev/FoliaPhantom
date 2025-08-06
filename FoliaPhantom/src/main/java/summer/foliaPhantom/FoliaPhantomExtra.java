@@ -14,26 +14,26 @@ import java.util.List;
 import java.util.function.IntConsumer;
 import java.util.logging.Level;
 
-public class FoliaPhantom extends JavaPlugin {
+public class FoliaPhantomExtra extends JavaPlugin {
 
-    private static FoliaPhantom instance;
+    private static FoliaPhantomExtra instance;
     private final List<Plugin> wrappedPlugins = new ArrayList<>();
     private final List<File> tempJarFiles = new ArrayList<>();
     private PluginPatcher pluginPatcher;
 
-    public static FoliaPhantom getInstance() {
+    public static FoliaPhantomExtra getInstance() {
         return instance;
     }
 
     @Override
     public void onLoad() {
         instance = this;
-        getLogger().info("[Phantom] === FoliaPhantom onLoad (JAR Repackaging) ===");
+        getLogger().info("[Phantom-extra] === FoliaPhantom-extra onLoad (JAR Repackaging) ===");
         saveDefaultConfig();
         this.pluginPatcher = new PluginPatcher(getLogger());
 
         if (!getConfig().getBoolean("auto-scan-plugins.enabled", false)) {
-            getLogger().info("[Phantom] Auto-scanning is disabled. No plugins will be patched.");
+            getLogger().info("[Phantom-extra] Auto-scanning is disabled. No plugins will be patched.");
             return;
         }
 
@@ -47,7 +47,7 @@ public class FoliaPhantom extends JavaPlugin {
 
         File[] pluginJars = pluginsDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".jar"));
         if (pluginJars == null) {
-            getLogger().warning("[Phantom] Could not list files in plugins directory.");
+            getLogger().warning("[Phantom-extra] Could not list files in plugins directory.");
             return;
         }
 
@@ -55,12 +55,12 @@ public class FoliaPhantom extends JavaPlugin {
             try {
                 String pluginName = PluginPatcher.getPluginNameFromJar(originalJar);
                 if (pluginName == null || excludedPlugins.contains(pluginName) || pluginName.equals(this.getDescription().getName())) {
-                    getLogger().info(String.format("[Phantom] Skipping excluded, invalid, or self plugin: %s", originalJar.getName()));
+                    getLogger().info(String.format("[Phantom-extra] Skipping excluded, invalid, or self plugin: %s", originalJar.getName()));
                     continue;
                 }
 
                 if (PluginPatcher.isFoliaSupported(originalJar)) {
-                    getLogger().info(String.format("[Phantom] Plugin '%s' is already Folia-supported. Skipping.", pluginName));
+                    getLogger().info(String.format("[Phantom-extra] Plugin '%s' is already Folia-supported. Skipping.", pluginName));
                     continue;
                 }
 
@@ -73,42 +73,42 @@ public class FoliaPhantom extends JavaPlugin {
                 Plugin plugin = pluginManager.loadPlugin(tempJar);
                 if (plugin != null) {
                     wrappedPlugins.add(plugin);
-                    getLogger().info(String.format("[Phantom][%s] Patched plugin loaded successfully.", pluginName));
+                    getLogger().info(String.format("[Phantom-extra][%s] Patched plugin loaded successfully.", pluginName));
                 } else {
-                    getLogger().severe(String.format("[Phantom][%s] Failed to load the patched plugin.", pluginName));
+                    getLogger().severe(String.format("[Phantom-extra][%s] Failed to load the patched plugin.", pluginName));
                 }
 
             } catch (Exception e) {
-                getLogger().log(Level.SEVERE, String.format("[Phantom] Failed to process plugin %s", originalJar.getName()), e);
+                getLogger().log(Level.SEVERE, String.format("[Phantom-extra] Failed to process plugin %s", originalJar.getName()), e);
             }
         }
     }
 
     @Override
     public void onEnable() {
-        getLogger().info("[Phantom] === FoliaPhantom onEnable ===");
+        getLogger().info("[Phantom-extra] === FoliaPhantom-extra onEnable ===");
         for (Plugin plugin : wrappedPlugins) {
             if (plugin != null && !plugin.isEnabled()) {
-                getLogger().info(String.format("[Phantom][%s] Enabling patched plugin...", plugin.getName()));
+                getLogger().info(String.format("[Phantom-extra][%s] Enabling patched plugin...", plugin.getName()));
                 getServer().getPluginManager().enablePlugin(plugin);
             }
         }
-        getLogger().info("[Phantom] All patched plugins have been enabled.");
+        getLogger().info("[Phantom-extra] All patched plugins have been enabled.");
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("[Phantom] === FoliaPhantom onDisable ===");
+        getLogger().info("[Phantom-extra] === FoliaPhantom-extra onDisable ===");
         wrappedPlugins.clear();
 
-        getLogger().info("[Phantom] Cleaning up temporary files...");
+        getLogger().info("[Phantom-extra] Cleaning up temporary files...");
         for (File file : tempJarFiles) {
             if (file.exists() && !file.delete()) {
-                getLogger().warning("[Phantom] Could not delete temporary file: " + file.getPath());
+                getLogger().warning("[Phantom-extra] Could not delete temporary file: " + file.getPath());
                 file.deleteOnExit();
             }
         }
         tempJarFiles.clear();
-        getLogger().info("[Phantom] FoliaPhantom has been disabled.");
+        getLogger().info("[Phantom-extra] FoliaPhantom-extra has been disabled.");
     }
 }

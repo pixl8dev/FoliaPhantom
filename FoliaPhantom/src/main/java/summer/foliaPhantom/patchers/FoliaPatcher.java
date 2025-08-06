@@ -4,10 +4,12 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
-import summer.foliaPhantom.FoliaPhantom;
+import summer.foliaPhantom.FoliaPhantomExtra;
 
 import java.util.List;
 import java.util.Map;
@@ -38,7 +40,14 @@ public final class FoliaPatcher {
             Map.entry("cancelAllTasks()V", true)
     ));
 
+    public static final Map<String, String> UNSAFE_METHOD_MAP = new ConcurrentHashMap<>();
+
     static {
+        // Format: <Original Method Signature, Patcher Method Name>
+        UNSAFE_METHOD_MAP.put("setType(Lorg/bukkit/Material;)V", "safeSetType");
+        UNSAFE_METHOD_MAP.put("setType(Lorg/bukkit/Material;Z)V", "safeSetTypeWithPhysics");
+
+
         // World Generation related methods
         REPLACEMENT_MAP.put("getDefaultWorldGenerator(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;", true);
         REPLACEMENT_MAP.put("createWorld(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;", true);
@@ -56,13 +65,13 @@ public final class FoliaPatcher {
     }
 
     public static World createWorld(org.bukkit.Server server, org.bukkit.WorldCreator creator) {
-        System.out.println("[Phantom] Intercepted createWorld call. Dispatching to dedicated world-gen thread and waiting for completion...");
+        System.out.println("[Phantom-extra] Intercepted createWorld call. Dispatching to dedicated world-gen thread and waiting for completion...");
         Callable<World> task = () -> server.createWorld(creator);
         Future<World> future = worldGenExecutor.submit(task);
         try {
             return future.get();
         } catch (InterruptedException | ExecutionException e) {
-            System.err.println("[Phantom] Failed to create world via dedicated executor.");
+            System.err.println("[Phantom-extra] Failed to create world via dedicated executor.");
             e.printStackTrace();
             return null;
         }
@@ -73,45 +82,58 @@ public final class FoliaPatcher {
 
         public FoliaChunkGenerator(org.bukkit.generator.ChunkGenerator original) {
             this.original = original;
+            System.out.println("[Phantom-extra-WorldGen] Wrapping ChunkGenerator: " + original.getClass().getName());
+        }
+
+        private void log(String methodName) {
+            System.out.println("[Phantom-extra-WorldGen] FoliaChunkGenerator." + methodName + " called on thread: " + Thread.currentThread().getName());
         }
 
         @Override
         public ChunkData generateChunkData(World world, java.util.Random random, int x, int z, BiomeGrid biome) {
+            log("generateChunkData");
             return original.generateChunkData(world, random, x, z, biome);
         }
 
-            @Override
-            public boolean shouldGenerateNoise() {
-                return original.shouldGenerateNoise();
-            }
+        @Override
+        public boolean shouldGenerateNoise() {
+            log("shouldGenerateNoise");
+            return original.shouldGenerateNoise();
+        }
 
-            @Override
-            public boolean shouldGenerateSurface() {
-                return original.shouldGenerateSurface();
-            }
+        @Override
+        public boolean shouldGenerateSurface() {
+            log("shouldGenerateSurface");
+            return original.shouldGenerateSurface();
+        }
 
-            @Override
-            public boolean shouldGenerateBedrock() {
-                return original.shouldGenerateBedrock();
-            }
+        @Override
+        public boolean shouldGenerateBedrock() {
+            log("shouldGenerateBedrock");
+            return original.shouldGenerateBedrock();
+        }
 
-            @Override
-            public boolean shouldGenerateCaves() {
-                return original.shouldGenerateCaves();
-            }
+        @Override
+        public boolean shouldGenerateCaves() {
+            log("shouldGenerateCaves");
+            return original.shouldGenerateCaves();
+        }
 
-            @Override
-            public boolean shouldGenerateDecorations() {
-                return original.shouldGenerateDecorations();
-            }
+        @Override
+        public boolean shouldGenerateDecorations() {
+            log("shouldGenerateDecorations");
+            return original.shouldGenerateDecorations();
+        }
 
-            @Override
-            public boolean shouldGenerateMobs() {
-                return original.shouldGenerateMobs();
-            }
+        @Override
+        public boolean shouldGenerateMobs() {
+            log("shouldGenerateMobs");
+            return original.shouldGenerateMobs();
+        }
 
         @Override
         public Location getFixedSpawnLocation(World world, java.util.Random random) {
+            log("getFixedSpawnLocation");
             return original.getFixedSpawnLocation(world, random);
         }
     }
@@ -276,5 +298,60 @@ public final class FoliaPatcher {
             }
         });
         runningTasks.clear();
+    }
+
+    // --- Entity Scheduler Wrappers ---
+
+    public static BukkitTask folia_runTask(Entity entity, Plugin plugin, Runnable runnable) {
+        int taskId = taskIdCounter.getAndIncrement();
+        Runnable wrappedRunnable = wrapRunnable(runnable, taskId, false);
+        ScheduledTask foliaTask = entity.getScheduler().run(plugin, t -> wrappedRunnable.run(), null);
+        runningTasks.put(taskId, foliaTask);
+        return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, true, foliaTask);
+    }
+
+    public static BukkitTask folia_runTaskLater(Entity entity, Plugin plugin, Runnable runnable, long delay) {
+        int taskId = taskIdCounter.getAndIncrement();
+        Runnable wrappedRunnable = wrapRunnable(runnable, taskId, false);
+        ScheduledTask foliaTask = entity.getScheduler().runDelayed(plugin, t -> wrappedRunnable.run(), null, Math.max(1, delay));
+        runningTasks.put(taskId, foliaTask);
+        return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, true, foliaTask);
+    }
+
+    public static BukkitTask folia_runTaskTimer(Entity entity, Plugin plugin, Runnable runnable, long delay, long period) {
+        ScheduledTask foliaTask = entity.getScheduler().runAtFixedRate(plugin, t -> runnable.run(), null, Math.max(1, delay), Math.max(1, period));
+        int taskId = taskIdCounter.getAndIncrement();
+        runningTasks.put(taskId, foliaTask);
+        return new FoliaBukkitTask(taskId, plugin, FoliaPatcher::cancelTaskById, true, foliaTask);
+    }
+
+    public static int folia_scheduleSyncDelayedTask(Entity entity, Plugin plugin, Runnable runnable, long delay) {
+        return folia_runTaskLater(entity, plugin, runnable, delay).getTaskId();
+    }
+
+    public static int folia_scheduleSyncRepeatingTask(Entity entity, Plugin plugin, Runnable runnable, long delay, long period) {
+        return folia_runTaskTimer(entity, plugin, runnable, delay, period).getTaskId();
+    }
+
+    // --- Thread-Safety Wrappers ---
+
+    public static void safeSetType(Block block, org.bukkit.Material material) {
+        if (Bukkit.isPrimaryThread()) {
+            block.setType(material);
+        } else {
+            Bukkit.getRegionScheduler().run(FoliaPhantomExtra.getInstance(), block.getLocation(), task -> {
+                block.setType(material);
+            });
+        }
+    }
+
+    public static void safeSetTypeWithPhysics(Block block, org.bukkit.Material material, boolean applyPhysics) {
+        if (Bukkit.isPrimaryThread()) {
+            block.setType(material, applyPhysics);
+        } else {
+            Bukkit.getRegionScheduler().run(FoliaPhantomExtra.getInstance(), block.getLocation(), task -> {
+                block.setType(material, applyPhysics);
+            });
+        }
     }
 }
