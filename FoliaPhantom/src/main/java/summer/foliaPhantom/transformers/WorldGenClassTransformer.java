@@ -48,8 +48,12 @@ public class WorldGenClassTransformer implements ClassTransformer {
                 // Handle createWorld specifically
                 if ("createWorld".equals(name) && "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;".equals(desc) && "org/bukkit/Server".equals(owner)) {
                     // The stack before this call is [serverInstance, worldCreatorInstance]
-                    // Our new method only needs worldCreatorInstance. So we pop the server instance.
+                    // Our new method only needs worldCreatorInstance.
+                    // 1. Swap the top two items on the stack. Stack is now [worldCreatorInstance, serverInstance]
+                    super.visitInsn(Opcodes.SWAP);
+                    // 2. Pop the serverInstance off the top. Stack is now [worldCreatorInstance]
                     super.visitInsn(Opcodes.POP);
+                    // 3. Call our static patcher method.
                     String newDesc = "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;";
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
                     return;
