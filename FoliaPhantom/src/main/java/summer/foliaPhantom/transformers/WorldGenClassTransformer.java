@@ -43,15 +43,21 @@ public class WorldGenClassTransformer implements ClassTransformer {
         public WorldGenMethodVisitor(MethodVisitor mv) { super(Opcodes.ASM9, mv); }
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean isInterface) {
-            if (FoliaPatcher.REPLACEMENT_MAP.containsKey(name + desc)) {
-                String newDesc = null;
-                if ("createWorld".equals(name) && "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;".equals(desc) && opcode == Opcodes.INVOKEINTERFACE) {
-                    newDesc = "(Lorg/bukkit/Server;Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;";
-                } else if ("getDefaultWorldGenerator".equals(name) && "(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;".equals(desc)) {
-                    newDesc = "(Lorg/bukkit/plugin/Plugin;Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;";
+            String methodKey = name + desc;
+            if (FoliaPatcher.REPLACEMENT_MAP.containsKey(methodKey)) {
+                // Handle createWorld specifically
+                if ("createWorld".equals(name) && "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;".equals(desc) && "org/bukkit/Server".equals(owner)) {
+                    // The stack before this call is [serverInstance, worldCreatorInstance]
+                    // Our new method only needs worldCreatorInstance. So we pop the server instance.
+                    super.visitInsn(Opcodes.POP);
+                    String newDesc = "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;";
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
+                    return;
                 }
 
-                if (newDesc != null) {
+                // Handle getDefaultWorldGenerator
+                if ("getDefaultWorldGenerator".equals(name) && "(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;".equals(desc)) {
+                    String newDesc = "(Lorg/bukkit/plugin/Plugin;Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;";
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
                     return;
                 }

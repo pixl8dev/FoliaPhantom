@@ -4,6 +4,7 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
@@ -64,14 +65,15 @@ public final class FoliaPatcher {
         return new FoliaChunkGenerator(originalGenerator);
     }
 
-    public static World createWorld(org.bukkit.Server server, org.bukkit.WorldCreator creator) {
-        System.out.println("[Phantom-extra] Intercepted createWorld call. Dispatching to dedicated world-gen thread and waiting for completion...");
-        Callable<World> task = () -> server.createWorld(creator);
+    public static World createWorld(org.bukkit.WorldCreator creator) {
+        System.out.println("[Phantom-extra] Intercepted createWorld call. Using creator.createWorld() on a dedicated thread...");
+        Callable<World> task = creator::createWorld;
         Future<World> future = worldGenExecutor.submit(task);
         try {
+            // Block the calling thread (from the plugin) until our executor thread is done.
             return future.get();
         } catch (InterruptedException | ExecutionException e) {
-            System.err.println("[Phantom-extra] Failed to create world via dedicated executor.");
+            System.err.println("[Phantom-extra] Failed to create world via creator.createWorld().");
             e.printStackTrace();
             return null;
         }
