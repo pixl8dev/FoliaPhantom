@@ -5,12 +5,14 @@ import summer.foliaPhantom.patchers.FoliaPatcher;
 
 import java.util.logging.Level;
 
-public class WorldGenClassTransformer {
+public class WorldGenClassTransformer implements ClassTransformer {
     private final java.util.logging.Logger logger;
 
     public WorldGenClassTransformer(java.util.logging.Logger logger) {
         this.logger = logger;
     }
+
+    @Override
 
     public byte[] transform(byte[] originalBytes) {
         String className = "Unknown";
@@ -22,7 +24,7 @@ public class WorldGenClassTransformer {
             cr.accept(cv, ClassReader.EXPAND_FRAMES);
             return cw.toByteArray();
         } catch (Exception e) {
-            logger.log(Level.WARNING, "[Phantom] Failed to transform class " + className + " for WorldGen. Returning original bytes.", e);
+            logger.log(Level.WARNING, "[Phantom-extra] Failed to transform class " + className + " for WorldGen. Returning original bytes.", e);
             return originalBytes;
         }
     }
@@ -41,15 +43,25 @@ public class WorldGenClassTransformer {
         public WorldGenMethodVisitor(MethodVisitor mv) { super(Opcodes.ASM9, mv); }
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean isInterface) {
-            if (FoliaPatcher.REPLACEMENT_MAP.containsKey(name + desc)) {
-                String newDesc = null;
-                if ("createWorld".equals(name) && "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;".equals(desc) && opcode == Opcodes.INVOKEINTERFACE) {
-                    newDesc = "(Lorg/bukkit/Server;Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;";
-                } else if ("getDefaultWorldGenerator".equals(name) && "(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;".equals(desc)) {
-                    newDesc = "(Lorg/bukkit/plugin/Plugin;Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;";
+            String methodKey = name + desc;
+            if (FoliaPatcher.REPLACEMENT_MAP.containsKey(methodKey)) {
+                // Handle createWorld specifically
+                if ("createWorld".equals(name) && "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;".equals(desc) && "org/bukkit/Server".equals(owner)) {
+                    // The stack before this call is [serverInstance, worldCreatorInstance]
+                    // Our new method only needs worldCreatorInstance.
+                    // 1. Swap the top two items on the stack. Stack is now [worldCreatorInstance, serverInstance]
+                    super.visitInsn(Opcodes.SWAP);
+                    // 2. Pop the serverInstance off the top. Stack is now [worldCreatorInstance]
+                    super.visitInsn(Opcodes.POP);
+                    // 3. Call our static patcher method.
+                    String newDesc = "(Lorg/bukkit/WorldCreator;)Lorg/bukkit/World;";
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
+                    return;
                 }
 
-                if (newDesc != null) {
+                // Handle getDefaultWorldGenerator
+                if ("getDefaultWorldGenerator".equals(name) && "(Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;".equals(desc)) {
+                    String newDesc = "(Lorg/bukkit/plugin/Plugin;Ljava/lang/String;Ljava/lang/String;)Lorg/bukkit/generator/ChunkGenerator;";
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, PATCHER_INTERNAL_NAME, name, newDesc, false);
                     return;
                 }

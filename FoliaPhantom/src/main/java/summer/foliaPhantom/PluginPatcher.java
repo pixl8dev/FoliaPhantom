@@ -1,7 +1,10 @@
 package summer.foliaPhantom;
 
+import summer.foliaPhantom.transformers.ClassTransformer;
 import summer.foliaPhantom.transformers.SchedulerClassTransformer;
 import summer.foliaPhantom.transformers.WorldGenClassTransformer;
+import summer.foliaPhantom.transformers.EntitySchedulerTransformer;
+import summer.foliaPhantom.transformers.ThreadSafetyTransformer;
 
 import java.io.File;
 import java.io.IOException;
@@ -10,6 +13,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -18,17 +23,19 @@ import java.util.zip.ZipOutputStream;
 public class PluginPatcher {
 
     private final Logger logger;
-    private final SchedulerClassTransformer schedulerTransformer;
-    private final WorldGenClassTransformer worldGenTransformer;
+    private final List<ClassTransformer> transformers = new ArrayList<>();
 
     public PluginPatcher(Logger logger) {
         this.logger = logger;
-        this.schedulerTransformer = new SchedulerClassTransformer(logger);
-        this.worldGenTransformer = new WorldGenClassTransformer(logger);
+        // Register all transformers here. Order is critical.
+        this.transformers.add(new ThreadSafetyTransformer(logger));
+        this.transformers.add(new WorldGenClassTransformer(logger));
+        this.transformers.add(new EntitySchedulerTransformer(logger));
+        this.transformers.add(new SchedulerClassTransformer(logger));
     }
 
     public void patchPlugin(File originalJar, File tempJar) throws IOException {
-        logger.info(String.format("[Phantom] Creating patched JAR at: %s", tempJar.getPath()));
+        logger.info(String.format("[Phantom-extra] Creating patched JAR at: %s", tempJar.getPath()));
         createPatchedJar(originalJar.toPath(), tempJar.toPath());
     }
 
@@ -47,10 +54,11 @@ public class PluginPatcher {
                         String modifiedYml = addFoliaSupportedFlag(originalYml);
                         zos.write(modifiedYml.getBytes(StandardCharsets.UTF_8));
                     } else if (entry.getName().endsWith(".class")) {
-                        byte[] originalBytes = zis.readAllBytes();
-                        byte[] transformedBytes = schedulerTransformer.transform(originalBytes);
-                        transformedBytes = worldGenTransformer.transform(transformedBytes);
-                        zos.write(transformedBytes);
+                        byte[] classBytes = zis.readAllBytes();
+                        for (ClassTransformer transformer : transformers) {
+                            classBytes = transformer.transform(classBytes);
+                        }
+                        zos.write(classBytes);
                     } else {
                         copyStream(zis, zos);
                     }

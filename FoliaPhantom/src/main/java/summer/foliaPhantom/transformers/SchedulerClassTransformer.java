@@ -5,12 +5,14 @@ import summer.foliaPhantom.patchers.FoliaPatcher;
 
 import java.util.logging.Level;
 
-public class SchedulerClassTransformer {
+public class SchedulerClassTransformer implements ClassTransformer {
     private final java.util.logging.Logger logger;
 
     public SchedulerClassTransformer(java.util.logging.Logger logger) {
         this.logger = logger;
     }
+
+    @Override
 
     public byte[] transform(byte[] originalBytes) {
         String className = "Unknown";
@@ -22,7 +24,7 @@ public class SchedulerClassTransformer {
             cr.accept(cv, ClassReader.EXPAND_FRAMES);
             return cw.toByteArray();
         } catch (Exception e) {
-            logger.log(Level.WARNING, "[Phantom] Failed to transform class " + className + ". Returning original bytes.", e);
+            logger.log(Level.WARNING, "[Phantom-extra] Failed to transform class " + className + ". Returning original bytes.", e);
             return originalBytes;
         }
     }
