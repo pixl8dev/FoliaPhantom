@@ -5,6 +5,8 @@
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
 [![License](https://img.shields.io/github/license/MARVserver/FoliaPhantom)](LICENSE)
 
+## 🔗 日本語解説動画  
+[YouTubeで視聴する](https://youtu.be/l1Tjgye6z6Q)
 **FoliaPhantom-extra** は、旧来の Bukkit / Spigot / Paper プラグインを、Folia サーバー（PaperMC のマルチスレッド対応版）で動作させるための、手動パッチ適用ユーティリティです。
 
 このプラグインは、対象プラグインの JAR ファイルを修正し、Folia のスレッドモデルに適合しないスケジューラAPI呼び出しを、FoliaネイティブのAPI呼び出しに置き換えます。これにより、開発者が Folia 対応を施していないプラグインでも、多くの場合で動作させることが可能になります。
