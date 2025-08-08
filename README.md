@@ -5,7 +5,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
 [![License](https://img.shields.io/github/license/MARVserver/FoliaPhantom)](LICENSE)
 
-## 🔗 日本語解説動画  
+## 🔗 日本語解説動画 クリック⇩
 [![動画を見る](https://img.youtube.com/vi/l1Tjgye6z6Q/0.jpg)](https://youtu.be/l1Tjgye6z6Q)
 
 
