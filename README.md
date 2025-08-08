@@ -1,42 +1,35 @@
-# FoliaPhantom
+# FoliaPhantom-extra
 ![ロゴ](logo.png)
 **日本語 (Japanese)** | [English](#english)
 
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
 [![License](https://img.shields.io/github/license/MARVserver/FoliaPhantom)](LICENSE)
 
-**FoliaPhantom** は、旧来の Bukkit / Spigot / Paper プラグインを、Folia サーバー（PaperMC のマルチスレッド対応版）で動作させるための画期的な互換性レイヤーです。
+**FoliaPhantom-extra** は、旧来の Bukkit / Spigot / Paper プラグインを、Folia サーバー（PaperMC のマルチスレッド対応版）で動作させるための、手動パッチ適用ユーティリティです。
 
-プラグインの JAR ファイルをサーバー起動時に動的に解析・修正し、Folia のスレッドモデルに適合しないスケジューラAPI呼び出しを、FoliaネイティブのAPI呼び出しに置き換えます。これにより、開発者が Folia 対応を施していないプラグインでも、多くの場合はそのまま動作させることが可能になります。
+このプラグインは、対象プラグインの JAR ファイルを修正し、Folia のスレッドモデルに適合しないスケジューラAPI呼び出しを、FoliaネイティブのAPI呼び出しに置き換えます。これにより、開発者が Folia 対応を施していないプラグインでも、多くの場合で動作させることが可能になります。
 
 ---
 
 ## 🚀 主な特徴
 
-- **バイトコード変換技術**: サーバー起動時にプラグインのクラスファイルを直接解析し、`BukkitScheduler` の呼び出しを Folia の `RegionScheduler` や `AsyncScheduler` を使うコードに書き換えます。これにより、リフレクションやプロキシ方式よりもクリーンで高速な動作を実現します。
-- **`plugin.yml` の自動パッチ**: 対象プラグインの `plugin.yml` に `folia-supported: true` フラグを自動的に追加・修正し、Folia サーバーに正式対応プラグインとして認識させます。
+- **バイトコード変換技術**: プラグインのクラスファイルを直接解析し、`BukkitScheduler` の呼び出しを Folia の `RegionScheduler` や `AsyncScheduler` を使うコードに書き換えます。
+- **`plugin.yml` の自動パッチ**: パッチ処理中に、対象プラグインの `plugin.yml` に `folia-supported: true` フラグを自動的に追加・修正し、Folia サーバーに正式対応プラグインとして認識させます。
 - **幅広いスケジューラ対応**: `runTask`, `runTaskTimer` といった主要なメソッドに加え、`scheduleSyncDelayedTask` などの古いメソッドにも対応。同期・非同期タスクの両方を適切に変換します。
-- **設定不要の自動スキャン**: `plugins`フォルダ内のプラグインを自動的にスキャンし、Folia未対応のものにパッチを適用します。
 - **地形・ワールド生成の互換性**: `ChunkGenerator`や同期的な`createWorld`呼び出しをラップし、Foliaの非同期環境で動作するように試みます。
 
 ---
 
-## ⚙️ 導入手順
+## ⚙️ 導入と使用手順
 
-1.  **FoliaPhantom のダウンロード**: [Releasesページ](https://github.com/MARVserver/FoliaPhantom/releases)から最新版の `FoliaPhantom.jar` をダウンロードし、サーバーの `plugins` フォルダに配置します。
-2.  **サーバーの起動**: サーバーを起動するだけで、FoliaPhantom は `plugins` フォルダ内のすべてのプラグインを自動的にスキャンし、Foliaに未対応のプラグインに対してパッチを適用します。
-3.  **（任意）パッチ対象から除外**: もし、特定のプラグインにパッチを適用したくない場合は、初回起動時に生成される `plugins/FoliaPhantom/config.yml` を編集します。
+`FoliaPhantom-extra` は、他のプラグインを自動的にスキャンするのではなく、指定したJARファイルを手動で修正するツールです。
 
-    ```yaml
-    # FoliaPhantom - Configuration
-    auto-scan-plugins:
-      enabled: true
-      # パッチを適用したくないプラグインのリスト
-      excluded-plugins:
-        - "SomePlugin"
-        - "AnotherPlugin"
-    ```
-    `excluded-plugins` リストにプラグイン名を追加することで、そのプラグインはスキャン対象から除外されます。
+1.  **FoliaPhantom-extra の導入**: [Releasesページ](https://github.com/MARVserver/FoliaPhantom/releases)から最新版の `FoliaPhantom-extra.jar` をダウンロードし、サーバーの `plugins` フォルダに配置します。
+2.  **ディレクトリの生成**: サーバーを一度起動します。`plugins/FoliaPhantom-extra/` フォルダ内に `input` と `output` という2つのディレクトリが自動で生成されます。
+3.  **パッチ対象の配置**: サーバーを停止し、パッチを適用したいプラグインのJARファイルを `input` ディレクトリに移動します。
+4.  **パッチの実行**: 再度サーバーを起動します。`FoliaPhantom-extra` は `input` ディレクトリ内のすべてのJARファイルを検出し、パッチ処理を実行します。
+5.  **成果物の確認**: パッチが完了したJARファイルは `output` ディレクトリに保存されます。処理が成功すると、`input` ディレクトリ内の元のファイルは削除されます。
+6.  **プラグインの導入**: `output` ディレクトリからパッチ済みのJARファイルを取り出し、サーバーのメインの `plugins` フォルダに配置して使用してください。
 
 ---
 
@@ -51,21 +44,19 @@
 
 ## 🛠️ 技術的な仕組み
 
-FoliaPhantom は、単なるプロキシやリフレクションとは一線を画す、高度なバイトコードエンジニアリング技術を採用しています。
+FoliaPhantom-extra は、高度なバイトコードエンジニアリング技術を採用しています。
 
-1.  **JARの解析**: `onLoad` フェーズで `config.yml` に記載されたプラグインのJARを読み込みます。
-2.  **一時JARの生成**: パッチを適用するための一時的なJARファイルを `plugins/FoliaPhantom/temp-jars/` 内に作成します。
-3.  **バイトコード変換 (ASM)**: 各クラスファイル（`.class`）をバイトコードレベルで解析し、以下のAPI呼び出しを発見すると、それを `FoliaPatcher` クラスの静的メソッド呼び出しに置き換えます。
+1.  **JARの検出**: `onEnable` フェーズで `plugins/FoliaPhantom-extra/input/` ディレクトリ内のJARファイルをスキャンします。
+2.  **出力JARの生成**: パッチを適用するための出力用JARファイルを `plugins/FoliaPhantom-extra/output/` 内に作成します。
+3.  **バイトコード変換 (ASM)**: 各クラスファイル（`.class`）をバイトコードレベルで解析し、以下のAPI呼び出しを発見すると、それを内部のパッチャーロジックを呼び出すコードに置き換えます。
     -   `org.bukkit.scheduler.BukkitScheduler` の各種メソッド
     -   `org.bukkit.plugin.Plugin#getDefaultWorldGenerator`
     -   `org.bukkit.Server#createWorld`
-4.  **`FoliaPatcher` の役割**: この内部クラスは、元の呼び出しに対応する Folia のAPIを呼び出すロジックを持っています。
+4.  **パッチャーの役割**: 内部ロジックは、元の呼び出しに対応する Folia のAPIを呼び出します。
     -   **スケジューラ**: `RegionScheduler`や`AsyncScheduler`を適切に使い分けます。
     -   **ワールド生成**: `getDefaultWorldGenerator`が返す`ChunkGenerator`をラッパーで包み、`createWorld`の呼び出しを専用のスレッドで実行してデッドロックを回避します。
 5.  **`plugin.yml` のパッチ**: `folia-supported: true` をYAMLに追加・上書きします。
-6.  **パッチ済みJARのロード**: 全ての変換とパッチが完了した一時JARを、Bukkit の `PluginManager` を通じてサーバーにロードさせます。
-
-このアプローチにより、ラップ対象のプラグインは自身のコードが一切変更されていないかのように動作しつつ、その実態は Folia に最適化されたスケジューリング処理が実行されることになります。
+6.  **保存**: 全ての変換とパッチが完了したJARを `output` ディレクトリに保存します。
 
 ---
 ---
@@ -75,38 +66,31 @@ FoliaPhantom は、単なるプロキシやリフレクションとは一線を�
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
 [![License](https://img.shields.io/github/license/MARVserver/FoliaPhantom)](LICENSE)
 
-**FoliaPhantom** is a groundbreaking compatibility layer designed to run legacy Bukkit, Spigot, and Paper plugins on a Folia server (the multi-threaded version of PaperMC).
+**FoliaPhantom-extra** is a manual patching utility designed to run legacy Bukkit, Spigot, and Paper plugins on a Folia server (the multi-threaded version of PaperMC).
 
-It works by dynamically analyzing and patching plugin JAR files at server startup, replacing scheduler API calls incompatible with Folia's threading model with their native Folia equivalents. This allows many plugins, even those not updated by their developers for Folia, to run seamlessly.
+This plugin modifies a target plugin's JAR file, replacing scheduler API calls incompatible with Folia's threading model with their native Folia equivalents. This allows many plugins, even those not updated by their developers for Folia, to run successfully.
 
 ---
 
 ## 🚀 Key Features
 
--   **Bytecode Transformation Technology**: Directly analyzes plugin class files at startup and rewrites `BukkitScheduler` calls to use Folia's `RegionScheduler` and `AsyncScheduler`. This provides a cleaner, faster solution than reflection or proxy-based methods.
--   **Automatic `plugin.yml` Patching**: Automatically adds or corrects the `folia-supported: true` flag in the target plugin's `plugin.yml`, ensuring it is recognized as a compliant plugin by the Folia server.
+-   **Bytecode Transformation Technology**: Directly analyzes plugin class files and rewrites `BukkitScheduler` calls to use Folia's `RegionScheduler` and `AsyncScheduler`.
+-   **Automatic `plugin.yml` Patching**: During the patching process, it automatically adds or corrects the `folia-supported: true` flag in the target plugin's `plugin.yml`, ensuring it is recognized as a compliant plugin by the Folia server.
 -   **Broad Scheduler Compatibility**: Supports major methods like `runTask` and `runTaskTimer`, as well as legacy methods like `scheduleSyncDelayedTask`, properly converting both synchronous and asynchronous tasks.
--   **Zero-Configuration Auto-Scan**: Automatically scans plugins in your `plugins` folder and patches those not yet compatible with Folia.
 -   **Terrain & World Gen Compatibility**: Attempts to wrap calls to `ChunkGenerator` and synchronous `createWorld` to work within Folia's asynchronous environment.
 
 ---
 
-## ⚙️ Installation Guide
+## ⚙️ Installation and Usage
 
-1.  **Download FoliaPhantom**: Download the latest `FoliaPhantom.jar` from the [Releases page](https://github.com/MARVserver/FoliaPhantom/releases) and place it in your server's `plugins` folder.
-2.  **Start the Server**: Simply start your server. FoliaPhantom will automatically scan all plugins in the `plugins` folder and apply compatibility patches to any that are not Folia-native.
-3.  **Exclude Plugins (Optional)**: If you need to prevent a specific plugin from being patched, edit the `config.yml` file generated in `plugins/FoliaPhantom/` on the first run.
+`FoliaPhantom-extra` is a tool that manually patches specified JAR files, rather than automatically scanning them.
 
-    ```yaml
-    # FoliaPhantom - Configuration
-    auto-scan-plugins:
-      enabled: true
-      # List of plugins to exclude from patching.
-      excluded-plugins:
-        - "SomePlugin"
-        - "AnotherPlugin"
-    ```
-    Add the plugin's name to the `excluded-plugins` list to have it ignored by the scanner.
+1.  **Install FoliaPhantom-extra**: Download the latest `FoliaPhantom-extra.jar` from the [Releases page](https://github.com/MARVserver/FoliaPhantom/releases) and place it in your server's `plugins` folder.
+2.  **Generate Directories**: Start the server once. This will automatically create two directories: `input` and `output` inside the `plugins/FoliaPhantom-extra/` folder.
+3.  **Place Target JARs**: Stop the server. Move the plugin JAR files you want to patch into the `input` directory.
+4.  **Run the Patcher**: Start the server again. `FoliaPhantom-extra` will detect all JARs in the `input` directory and perform the patching process.
+5.  **Retrieve Patched JARs**: The patched JAR files will be saved to the `output` directory. Once a JAR is successfully processed, the original file in the `input` directory is deleted.
+6.  **Install the Patched Plugin**: Take the patched JAR file from the `output` directory and move it to your main server `plugins` folder for use.
 
 ---
 
@@ -121,18 +105,16 @@ It works by dynamically analyzing and patching plugin JAR files at server startu
 
 ## 🛠️ How It Works (Technical Deep Dive)
 
-FoliaPhantom employs sophisticated bytecode engineering, setting it apart from simple proxies or reflection.
+FoliaPhantom-extra employs sophisticated bytecode engineering.
 
-1.  **JAR Analysis**: During the `onLoad` phase, it scans all JARs in the `plugins` directory.
-2.  **Temporary JAR Creation**: It creates a temporary JAR file for patching inside `plugins/FoliaPhantom/temp-jars/`.
-3.  **Bytecode Transformation (ASM)**: It parses each class file (`.class`) at the bytecode level. When it finds a call to a targeted API, it replaces it with a static method call to the `FoliaPatcher` class. Targeted APIs include:
+1.  **JAR Detection**: During the `onEnable` phase, it scans for JAR files in the `plugins/FoliaPhantom-extra/input/` directory.
+2.  **Output JAR Creation**: It creates an output JAR file for patching inside `plugins/FoliaPhantom-extra/output/`.
+3.  **Bytecode Transformation (ASM)**: It parses each class file (`.class`) at the bytecode level. When it finds a call to a targeted API, it replaces it with code that calls internal patcher logic. Targeted APIs include:
     -   Methods in `org.bukkit.scheduler.BukkitScheduler`
     -   `org.bukkit.plugin.Plugin#getDefaultWorldGenerator`
     -   `org.bukkit.Server#createWorld`
-4.  **The `FoliaPatcher`'s Role**: This internal class contains the logic to invoke the appropriate Folia-native API.
+4.  **The Patcher's Role**: The internal logic invokes the appropriate Folia-native API.
     -   **Schedulers**: It intelligently redirects calls to `RegionScheduler` or `AsyncScheduler`.
     -   **World Generation**: It wraps the `ChunkGenerator` returned by `getDefaultWorldGenerator` and dispatches `createWorld` calls to a dedicated thread to prevent deadlocks.
 5.  **`plugin.yml` Patching**: It adds or overwrites the YAML file to include `folia-supported: true`.
-6.  **Loading the Patched JAR**: The fully transformed and patched temporary JAR is then loaded into the server via Bukkit's `PluginManager`.
-
-This approach allows the wrapped plugin to operate as if its code were unchanged, while its scheduling is actually being handled by Folia-optimized processes.
+6.  **Saving**: The fully transformed and patched JAR is saved to the `output` directory.
