@@ -1,6 +1,6 @@
 # FoliaPhantom-extra
 ![ロゴ](logo.png)
-**日本語 (Japanese)** | [English](#english)
+# **日本語 (Japanese)** | [English](#english)
 
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
 [![License](https://img.shields.io/github/license/MARVserver/FoliaPhantom)](LICENSE)
