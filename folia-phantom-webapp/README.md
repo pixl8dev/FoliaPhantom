@@ -11,7 +11,7 @@
 mvn -f FoliaPhantom/pom.xml clean package
 ```
 
-これにより、`FoliaPhantom/target/FoliaPhantom-extra-2.0-SNAPSHOT.jar` が生成されます。Webアプリケーションは、このJARファイルを起動時に読み込みます。このファイルが存在しない場合、Webアプリケーションは起動に失敗します。
+これにより、`FoliaPhantom/target/FoliaPhantom-extra-2.0-SNAPSHOT.jar` が生成されます。
 
 ## 2. ビルド方法
 
@@ -29,10 +29,23 @@ mvn -f FoliaPhantom/pom.xml clean package
 
 ## 3. 実行方法
 
-以下のコマンドでWebアプリケーションを起動します。
+Webアプリケーションを実行する前に、`HELPER_JAR_PATH` 環境変数を設定する必要があります。この環境変数には、`FoliaPhantom-extra-2.0-SNAPSHOT.jar` ファイルへの**絶対パス**を指定してください。
 
+**Windows (コマンドプロンプト):**
 ```bash
-# リポジトリのルートディレクトリで実行
+set HELPER_JAR_PATH=C:\path\to\your\project\FoliaPhantom\target\FoliaPhantom-extra-2.0-SNAPSHOT.jar
+java -jar folia-phantom-webapp\build\libs\folia-phantom-webapp-1.0.0.jar
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:HELPER_JAR_PATH="C:\path\to\your\project\FoliaPhantom\target\FoliaPhantom-extra-2.0-SNAPSHOT.jar"
+java -jar folia-phantom-webapp\build\libs\folia-phantom-webapp-1.0.0.jar
+```
+
+**Linux/macOS:**
+```bash
+export HELPER_JAR_PATH=/path/to/your/project/FoliaPhantom/target/FoliaPhantom-extra-2.0-SNAPSHOT.jar
 java -jar folia-phantom-webapp/build/libs/folia-phantom-webapp-1.0.0.jar
 ```
 

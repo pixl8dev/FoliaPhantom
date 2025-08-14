@@ -37,12 +37,20 @@ public class PatchService {
     private Map<String, byte[]> loadHelperClasses() throws IOException {
         logger.info("Loading helper classes from original JAR...");
         Map<String, byte[]> classes = new HashMap<>();
-        // The JAR is expected to be in the root of the original project structure
-        File originalJar = new File("FoliaPhantom/target/FoliaPhantom-extra-2.0-SNAPSHOT.jar");
+
+        String helperJarPath = System.getenv("HELPER_JAR_PATH");
+        if (helperJarPath == null || helperJarPath.isEmpty()) {
+            // Fallback to the default path if the environment variable is not set.
+            // This assumes the application is run from the project root.
+            helperJarPath = "FoliaPhantom/target/FoliaPhantom-extra-2.0-SNAPSHOT.jar";
+        }
+
+        File originalJar = new File(helperJarPath);
 
         if (!originalJar.exists()) {
             logger.error("Original JAR file not found at: {}. This is required for helper classes.", originalJar.getAbsolutePath());
             logger.error("Please ensure the original 'FoliaPhantom' project has been built with 'mvn clean package'.");
+            logger.error("Alternatively, set the HELPER_JAR_PATH environment variable to the absolute path of the 'FoliaPhantom-extra-2.0-SNAPSHOT.jar' file.");
             throw new IOException("Could not find the helper JAR: " + originalJar.getAbsolutePath());
         }
 
