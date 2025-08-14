@@ -13,8 +13,8 @@ java.sourceCompatibility = JavaVersion.VERSION_21
 
 repositories {
     mavenCentral()
-    flatDir {
-        dirs("libs")
+    maven {
+        url = uri("https://repo.papermc.io/repository/maven-public/")
     }
 }
 
@@ -22,7 +22,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.ow2.asm:asm:9.7")
     implementation("org.ow2.asm:asm-commons:9.7")
-    implementation(files("libs/FoliaPhantom-extra-2.0-SNAPSHOT.jar"))
+    compileOnly("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
