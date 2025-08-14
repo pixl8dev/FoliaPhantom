@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folia Phantom 3.0</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Folia Phantom 3.0</h1>
+            <p>Bukkit/Spigot/Paper プラグインを Folia 互換にパッチします。</p>
+        </header>
+        <main>
+            <div id="upload-box" class="upload-box">
+                <p>ここに JAR ファイルをドラッグ＆ドロップ</p>
+                <p>または</p>
+                <input type="file" id="file-input" accept=".jar" hidden>
+                <button id="upload-button" class="button">ファイルを選択</button>
+            </div>
+            <div id="status-box" class="status-box" style="display: none;">
+                <p id="status-text"></p>
+                <div id="progress-bar" class="progress-bar" style="display: none;">
+                    <div id="progress-bar-inner" class="progress-bar-inner"></div>
+                </div>
+                <a id="download-link" class="button" style="display: none;">ダウンロード</a>
+            </div>
+        </main>
+        <footer>
+            <p>Powered by FoliaPhantom-extra technology.</p>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
