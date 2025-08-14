@@ -4,33 +4,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadButton = document.getElementById('upload-button');
     const statusBox = document.getElementById('status-box');
     const statusText = document.getElementById('status-text');
-    const downloadLink = document.getElementById('download-link');
     const progressBar = document.getElementById('progress-bar');
     const progressBarInner = document.getElementById('progress-bar-inner');
+    const downloadLink = document.getElementById('download-link');
 
-    // Trigger file input when the button is clicked
+    // Fetch and apply configuration
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(config => {
+            document.getElementById('app-title').textContent = config.title;
+            document.getElementById('app-header').textContent = config.header;
+            document.getElementById('app-description').textContent = config.description;
+        })
+        .catch(error => console.error('Error fetching config:', error));
+
     uploadButton.addEventListener('click', () => {
         fileInput.click();
     });
 
-    // Trigger file input when the whole box is clicked
-    uploadBox.addEventListener('click', (e) => {
-        if (e.target.id === 'upload-box' || e.target.tagName === 'P') {
-             fileInput.click();
-        }
-    });
-
-    // Listen for file selection
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
         if (file) {
             handleFileUpload(file);
         }
     });
 
-    // Drag and drop events
-    uploadBox.addEventListener('dragover', (e) => {
-        e.preventDefault();
+    uploadBox.addEventListener('dragover', (event) => {
+        event.preventDefault();
         uploadBox.classList.add('dragover');
     });
 
@@ -38,34 +38,19 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadBox.classList.remove('dragover');
     });
 
-    uploadBox.addEventListener('drop', (e) => {
-        e.preventDefault();
+    uploadBox.addEventListener('drop', (event) => {
+        event.preventDefault();
         uploadBox.classList.remove('dragover');
-        const file = e.dataTransfer.files[0];
-        if (file && file.name.toLowerCase().endsWith('.jar')) {
+        const file = event.dataTransfer.files[0];
+        if (file) {
             handleFileUpload(file);
-        } else {
-            showStatus('無効なファイル形式です。.jar ファイルをアップロードしてください。', true);
         }
     });
 
-    function showStatus(message, isError = false) {
+    function handleFileUpload(file) {
         uploadBox.style.display = 'none';
         statusBox.style.display = 'block';
-        statusText.textContent = message;
-        statusText.className = isError ? 'error' : '';
-        downloadLink.style.display = 'none';
-        progressBar.style.display = 'none';
-    }
-
-    function resetUI() {
-        uploadBox.style.display = 'block';
-        statusBox.style.display = 'none';
-        fileInput.value = ''; // Reset file input
-    }
-
-    function handleFileUpload(file) {
-        showStatus('アップロード中...');
+        statusText.textContent = `Uploading ${file.name}...`;
         progressBar.style.display = 'block';
         progressBarInner.style.width = '0%';
 
@@ -78,37 +63,29 @@ document.addEventListener('DOMContentLoaded', () => {
         xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
                 const percentComplete = (event.loaded / event.total) * 100;
-                progressBarInner.style.width = percentComplete + '%';
-                if (percentComplete === 100) {
-                     showStatus('サーバーでパッチを適用中...');
-                }
+                progressBarInner.style.width = `${percentComplete}%`;
+                statusText.textContent = `Uploading ${file.name}... ${Math.round(percentComplete)}%`;
             }
         };
 
         xhr.onload = () => {
-            progressBar.style.display = 'none';
             if (xhr.status === 200) {
-                const blob = xhr.response;
+                statusText.textContent = 'Patching complete!';
+                progressBar.style.display = 'none';
+                downloadLink.style.display = 'block';
+                const blob = new Blob([xhr.response], { type: 'application/java-archive' });
                 const url = URL.createObjectURL(blob);
                 downloadLink.href = url;
-                downloadLink.download = 'patched-' + file.name;
-                downloadLink.style.display = 'block';
-                showStatus('パッチが正常に完了しました！', false);
-                statusText.className = 'success';
+                downloadLink.download = `patched-${file.name}`;
             } else {
-                showStatus(`エラー: ${xhr.responseText || 'パッチの適用中にエラーが発生しました。'}`, true);
-                // Add a button to go back
-                const backButton = document.createElement('button');
-                backButton.textContent = '戻る';
-                backButton.className = 'button';
-                backButton.style.marginTop = '1rem';
-                backButton.onclick = resetUI;
-                statusBox.appendChild(backButton);
+                statusText.textContent = `Error: ${xhr.statusText}`;
+                progressBar.style.display = 'none';
             }
         };
 
         xhr.onerror = () => {
-             showStatus('ネットワークエラーが発生しました。', true);
+            statusText.textContent = 'Upload failed.';
+            progressBar.style.display = 'none';
         };
 
         xhr.responseType = 'blob';

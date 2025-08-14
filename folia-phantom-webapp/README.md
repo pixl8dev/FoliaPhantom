@@ -2,7 +2,18 @@
 
 このWebアプリケーションは、既存のBukkit/Spigot/Paperプラグイン(.jar)を、Foliaサーバーで動作するようにパッチを適用するためのWeb UIを提供します。
 
-## 1. ビルド方法
+## 1. 設定
+
+`src/main/resources/config.properties` ファイルを編集することで、Web UIのテキストを変更できます。
+
+```properties
+# Application Configuration
+app.title=Folia Phantom Patcher
+app.header=Folia Phantom Plugin Patcher
+app.description=Upload a plugin JAR to patch it for Folia.
+```
+
+## 2. ビルド方法
 
 プロジェクトのルートディレクトリで以下のコマンドを実行してください。
 
@@ -16,7 +27,7 @@
 
 これにより、`folia-phantom-webapp/build/libs/` ディレクトリに実行可能なJARファイル `folia-phantom-webapp-1.0.0.jar` が生成されます。
 
-## 2. 実行方法
+## 3. 実行方法
 
 以下のコマンドでWebアプリケーションを起動します。
 
@@ -28,7 +39,7 @@ java -jar folia-phantom-webapp/build/libs/folia-phantom-webapp-1.0.0.jar
 サーバーが起動すると、コンソールに `Started FoliaPhantom3Application` というメッセージが表示されます。
 デフォルトでは、アプリケーションはポート `8080` で実行されます。
 
-## 3. 使い方
+## 4. 使い方
 
 1.  Webブラウザを開き、 `http://localhost:8080` にアクセスします。
 2.  表示されたページのアップロードエリアに、パッチを適用したいプラグインのJARファイルをドラッグ＆ドロップするか、「ファイルを選択」ボタンからファイルを選択します。
