@@ -15,14 +15,17 @@ mvn -f FoliaPhantom/pom.xml clean package
 
 ## 2. ビルド方法
 
-次に、このWebアプリケーション自体をビルドします。
+次に、このWebアプリケーション自体をビルドします。プロジェクトのルートディレクトリで以下のコマンドを実行してください。
 
 ```bash
-# リポジトリのルートディレクトリで実行
-mvn -f folia-phantom-webapp/pom.xml clean package
+# Windows
+./gradlew.bat -p folia-phantom-webapp build
+
+# Linux/macOS
+./gradlew -p folia-phantom-webapp build
 ```
 
-これにより、`folia-phantom-webapp/target/` ディレクトリに実行可能なJARファイル `folia-phantom-3-1.0.0.jar` が生成されます。
+これにより、`folia-phantom-webapp/build/libs/` ディレクトリに実行可能なJARファイル `folia-phantom-webapp-1.0.0.jar` が生成されます。
 
 ## 3. 実行方法
 
@@ -30,7 +33,7 @@ mvn -f folia-phantom-webapp/pom.xml clean package
 
 ```bash
 # リポジトリのルートディレクトリで実行
-java -jar folia-phantom-webapp/target/folia-phantom-3-1.0.0.jar
+java -jar folia-phantom-webapp/build/libs/folia-phantom-webapp-1.0.0.jar
 ```
 
 サーバーが起動すると、コンソールに `Started FoliaPhantom3Application` というメッセージが表示されます。
