@@ -13,12 +13,16 @@ java.sourceCompatibility = JavaVersion.VERSION_21
 
 repositories {
     mavenCentral()
+    flatDir {
+        dirs("libs")
+    }
 }
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.ow2.asm:asm:9.7")
     implementation("org.ow2.asm:asm-commons:9.7")
+    implementation(files("libs/FoliaPhantom-extra-2.0-SNAPSHOT.jar"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
