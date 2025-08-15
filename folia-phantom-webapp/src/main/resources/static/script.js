@@ -12,9 +12,21 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/api/config')
         .then(response => response.json())
         .then(config => {
+            // Apply text content
             document.getElementById('app-title').textContent = config.title;
             document.getElementById('app-header').textContent = config.header;
             document.getElementById('app-description').textContent = config.description;
+            document.getElementById('footer-text').textContent = config.footer;
+
+            // Apply theme
+            const theme = config.theme;
+            const root = document.documentElement;
+            root.style.setProperty('--bg-color', theme.bgColor);
+            root.style.setProperty('--primary-color', theme.primaryColor);
+            root.style.setProperty('--text-color', theme.textColor);
+            root.style.setProperty('--container-bg', theme.containerBg);
+            root.style.setProperty('--border-color', theme.borderColor);
+            root.style.setProperty('--button-hover-bg', theme.buttonHoverBg);
         })
         .catch(error => console.error('Error fetching config:', error));
 
