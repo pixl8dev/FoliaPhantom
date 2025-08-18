@@ -31,10 +31,19 @@ public final class FoliaPatcher {
             Map.entry("runTaskLaterAsynchronously(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;J)Lorg/bukkit/scheduler/BukkitTask;", true),
             Map.entry("runTaskTimerAsynchronously(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)Lorg/bukkit/scheduler/BukkitTask;", true),
             // Legacy methods returning int
+            Map.entry("scheduleSyncDelayedTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;)I", true),
             Map.entry("scheduleSyncDelayedTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;J)I", true),
             Map.entry("scheduleSyncRepeatingTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)I", true),
+            Map.entry("scheduleAsyncDelayedTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;)I", true),
             Map.entry("scheduleAsyncDelayedTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;J)I", true),
             Map.entry("scheduleAsyncRepeatingTask(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)I", true),
+            // BukkitRunnable overloads
+            Map.entry("scheduleSyncDelayedTask(Lorg/bukkit/plugin/Plugin;Lorg/bukkit/scheduler/BukkitRunnable;)I", true),
+            Map.entry("scheduleSyncDelayedTask(Lorg/bukkit/plugin/Plugin;Lorg/bukkit/scheduler/BukkitRunnable;J)I", true),
+            Map.entry("scheduleSyncRepeatingTask(Lorg/bukkit/plugin/Plugin;Lorg/bukkit/scheduler/BukkitRunnable;JJ)I", true),
+            Map.entry("scheduleAsyncDelayedTask(Lorg/bukkit/plugin/Plugin;Lorg/bukkit/scheduler/BukkitRunnable;)I", true),
+            Map.entry("scheduleAsyncDelayedTask(Lorg/bukkit/plugin/Plugin;Lorg/bukkit/scheduler/BukkitRunnable;J)I", true),
+            Map.entry("scheduleAsyncRepeatingTask(Lorg/bukkit/plugin/Plugin;Lorg/bukkit/scheduler/BukkitRunnable;JJ)I", true),
             // Cancel tasks
             Map.entry("cancelTask(I)V", true),
             Map.entry("cancelTasks(Lorg/bukkit/plugin/Plugin;)V", true),
@@ -266,6 +275,12 @@ public final class FoliaPatcher {
         return runTaskLater(ignored, plugin, runnable, delay).getTaskId();
     }
 
+    public static int scheduleSyncDelayedTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable) {
+        // Equivalent to scheduling with zero delay; Folia requires at least 1 tick for delayed tasks,
+        // but immediate run is fine via region/global scheduler run.
+        return runTask(ignored, plugin, runnable).getTaskId();
+    }
+
     public static int scheduleSyncRepeatingTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay, long period) {
         return runTaskTimer(ignored, plugin, runnable, delay, period).getTaskId();
     }
@@ -274,8 +289,38 @@ public final class FoliaPatcher {
         return runTaskLaterAsynchronously(ignored, plugin, runnable, delay).getTaskId();
     }
 
+    public static int scheduleAsyncDelayedTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable) {
+        // Async immediate execution
+        return runTaskAsynchronously(ignored, plugin, runnable).getTaskId();
+    }
+
     public static int scheduleAsyncRepeatingTask(BukkitScheduler ignored, Plugin plugin, Runnable runnable, long delay, long period) {
         return runTaskTimerAsynchronously(ignored, plugin, runnable, delay, period).getTaskId();
+    }
+
+    // BukkitRunnable overloads for legacy scheduler API
+    public static int scheduleSyncDelayedTask(BukkitScheduler ignored, Plugin plugin, org.bukkit.scheduler.BukkitRunnable task) {
+        return runTask(ignored, plugin, task).getTaskId();
+    }
+
+    public static int scheduleSyncDelayedTask(BukkitScheduler ignored, Plugin plugin, org.bukkit.scheduler.BukkitRunnable task, long delay) {
+        return runTaskLater(ignored, plugin, task, delay).getTaskId();
+    }
+
+    public static int scheduleSyncRepeatingTask(BukkitScheduler ignored, Plugin plugin, org.bukkit.scheduler.BukkitRunnable task, long delay, long period) {
+        return runTaskTimer(ignored, plugin, task, delay, period).getTaskId();
+    }
+
+    public static int scheduleAsyncDelayedTask(BukkitScheduler ignored, Plugin plugin, org.bukkit.scheduler.BukkitRunnable task) {
+        return runTaskAsynchronously(ignored, plugin, task).getTaskId();
+    }
+
+    public static int scheduleAsyncDelayedTask(BukkitScheduler ignored, Plugin plugin, org.bukkit.scheduler.BukkitRunnable task, long delay) {
+        return runTaskLaterAsynchronously(ignored, plugin, task, delay).getTaskId();
+    }
+
+    public static int scheduleAsyncRepeatingTask(BukkitScheduler ignored, Plugin plugin, org.bukkit.scheduler.BukkitRunnable task, long delay, long period) {
+        return runTaskTimerAsynchronously(ignored, plugin, task, delay, period).getTaskId();
     }
 
     public static void cancelTask(BukkitScheduler ignored, int taskId) {
