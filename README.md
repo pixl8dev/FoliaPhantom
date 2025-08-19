@@ -3,7 +3,9 @@
 # **日本語 (Japanese)** | [English](#english)
 
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
-[![License](https://img.shields.io/github/license/MARVserver/FoliaPhantom)](LICENSE)
+# 重要
+- licenseが変更されました
+
 
 ## 🔗 日本語解説動画 クリック⇩ AI音声
 [![動画を見る](https://img.youtube.com/vi/l1Tjgye6z6Q/0.jpg)](https://youtu.be/l1Tjgye6z6Q)
@@ -68,7 +70,8 @@ FoliaPhantom-extra は、高度なバイトコードエンジニアリング技�
 # English
 
 [![GitHub release](https://img.shields.io/github/v/release/MARVserver/FoliaPhantom.svg)](https://github.com/MARVserver/FoliaPhantom/releases)
-[![License](https://img.shields.io/github/license/MARVserver/FoliaPhantom)](LICENSE)
+# Important
+- License has changed
 
 **FoliaPhantom-extra** is a manual patching utility designed to run legacy Bukkit, Spigot, and Paper plugins on a Folia server (the multi-threaded version of PaperMC).
 
